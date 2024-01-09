@@ -125,15 +125,11 @@ namespace rtw
 		const float viewHeight{ 2.0f };
 		const float viewWidth{ viewHeight * aspectRatio };
 
-		//distance between pixels in viewport units (ideally should be equal)
+		// Distance between pixels in viewport units (ideally should be equal)
 		const float deltaU{ viewWidth / width };
 		const float deltaV{ viewHeight / height };
 
-		// frame buffer
-		const int size{ width * height * channels };
-		std::vector<float> imageData(size);
-
-
+		// Camera Properties
 		Vec3 cameraPos{ 0.0f, 0.0f, 0.0f };
 		Vec3 cameraForward{ 0.0f, 0.0f, -1.0f }; // Camera points in negative z direction
 		Vec3 cameraUp{ 0.0f, 1.0f, 0.0f };
@@ -144,12 +140,13 @@ namespace rtw
 		Vec3 center{ 0.5f, 0.5f, -3.0f };
 		float radius = 1.0f;
 
-
 		Vec3 viewCenter(cameraForward * focalLength); // Center of the screen in worldspace
-		Vec3 offset = (cameraUp * viewHeight) - (cameraRight * viewWidth);
-
 		Vec3 viewOrigin = viewCenter + 0.5f * ((cameraUp * viewHeight) - (cameraRight * viewWidth)); // Topleft of screen in worldspace
-		Vec3 pixelOrigin = viewOrigin + 0.5f * Vec3(deltaU, -deltaV, 0.0f);
+		Vec3 pixelOrigin = viewOrigin + 0.5f * Vec3(deltaU, -deltaV, 0.0f); // Offset viewOrigin to the center of the first pixel
+
+		// frame buffer
+		const int size{ width * height * channels };
+		std::vector<float> imageData(size);
 
 		for (int j = 0; j < height; ++j)
 		{
@@ -158,11 +155,10 @@ namespace rtw
 				// pixel pos in worldspace
 				Vec3 pixelPos{ pixelOrigin + Vec3(i * deltaU, -j * deltaV, 0.0f) };
 
-
 				Ray ray(cameraPos, pixelPos - cameraPos);
 
-				Vec3 color = getNormalColor(ray, center, radius);
 				//Vec3 color = getDiscriminantColor(ray, center, radius);
+				Vec3 color = getNormalColor(ray, center, radius);
 
 				int pixelIdx = 3 * (j * width + i);
 				imageData[pixelIdx] = color[0];

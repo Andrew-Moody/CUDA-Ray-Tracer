@@ -48,7 +48,10 @@ void demo::storePNG(const std::string& filepath, const std::vector<float>& data,
 		uintData[i++] = static_cast<stbi_uc>(255 * value);
 	}
 
-	stbi_write_png(filepath.c_str(), width, height, channels, uintData.data(), channels * width);
+	if (!stbi_write_png(filepath.c_str(), width, height, channels, uintData.data(), channels * width))
+	{
+		std::cout << "stbi_write_png Failed to write file" << '\n';
+	}
 }
 
 void demo::storePPM(const std::string& filepath, const std::vector<float>& data, int width, int height, int channels)
@@ -93,7 +96,7 @@ std::vector<float> demo::renderTestCPU(int width, int height, int channels)
 
 	std::vector<float> data(bufferSize);
 
-	for (int j = 0; j < height; ++j)
+	/*for (int j = 0; j < height; ++j)
 	{
 		for (int i = 0; i < width; ++i)
 		{
@@ -103,6 +106,17 @@ std::vector<float> demo::renderTestCPU(int width, int height, int channels)
 			data[pixel + 1] = float(j) / height;
 			data[pixel + 2] = 0.2f;
 		}
+	}*/
+
+
+	for (int pIdx = 0; pIdx < width * height; ++pIdx)
+	{
+		int px = pIdx % width;
+		int py = pIdx / width;
+
+		data[3 * pIdx] = float(px) / width;
+		data[3 * pIdx + 1] = float(py) / height;
+		data[3 * pIdx + 2] = 0.2f;
 	}
 
 	return data;

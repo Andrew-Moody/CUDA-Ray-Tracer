@@ -52,9 +52,9 @@ public:
 		return std::sqrt(length_squared());
 	}
 
-	friend float dot(const Vec3& a, const Vec3& b);
+	__host__ __device__ friend float dot(const Vec3& a, const Vec3& b);
 
-	friend Vec3 cross(const Vec3& a, const Vec3& b);
+	__host__ __device__ friend Vec3 cross(const Vec3& a, const Vec3& b);
 
 private:
 
@@ -68,7 +68,7 @@ __host__ __device__ inline Vec3 operator+(const Vec3& a, const Vec3& b)
 	return result += b;
 }
 
-inline Vec3 operator-(const Vec3& a, const Vec3& b)
+__host__ __device__ inline Vec3 operator-(const Vec3& a, const Vec3& b)
 {
 	Vec3 result{ -b };
 	result += a;
@@ -81,23 +81,23 @@ __host__ __device__ inline Vec3 operator*(const Vec3& v, float t)
 	return result *= t;
 }
 
-inline Vec3 operator*(float t, const Vec3& v)
+__host__ __device__ inline Vec3 operator*(float t, const Vec3& v)
 {
 	return v * t;
 }
 
-inline Vec3 normalized(const Vec3& v)
+__host__ __device__ inline Vec3 normalized(const Vec3& v)
 {
 	Vec3 vec{ v };
 	return vec *= (1.0f / v.length());
 }
 
-inline float dot(const Vec3& a, const Vec3& b)
+__host__ __device__ inline float dot(const Vec3& a, const Vec3& b)
 {
 	return (a.values[0] * b.values[0] + a.values[1] * b.values[1] + a.values[2] * b.values[2]);
 }
 
-inline Vec3 cross(const Vec3& a, const Vec3& b)
+__host__ __device__ inline Vec3 cross(const Vec3& a, const Vec3& b)
 {
 	return Vec3(
 		a.values[1] * b.values[2] - a.values[2] * b.values[1],
