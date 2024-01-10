@@ -10,12 +10,13 @@ int main()
 	constexpr int height{ 600 }; // image height in pixels
 	constexpr int channels{ 3 }; // floats per pixel 3 for rgb, 4 for rgba
 
-	std::vector<float> cpuImage = rtw::renderCPU(width, height, channels);
-	//std::vector<float> cpuImage = demo::renderTestCPU(width, height, channels);
+	constexpr int numSpheres{ 5 };
+
+	std::vector<float> cpuImage = rtw::renderCPU(width, height, channels, numSpheres);
 
 	demo::storePNG("Renders/renderCPU.png", cpuImage, width, height, channels);
 
-	std::vector<float> gpuImage = rtw::renderGPU(width, height, channels);
+	std::vector<float> gpuImage = rtw::renderGPU(width, height, channels, numSpheres);
 
 	demo::storePNG("Renders/renderGPU.png", gpuImage, width, height, channels);
 } 

@@ -27,6 +27,8 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\raytracing.cu" />
+    <CudaCompile Include="src\camera.cu" />
+    <CudaCompile Include="src\sphere.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\image.h">
@@ -38,5 +40,10 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\raytracing.cuh" />
+    <ClInclude Include="src\camera.cuh" />
+    <ClInclude Include="src\hittable.cuh" />
+    <ClInclude Include="src\sphere.cuh" />
+    <ClInclude Include="src\scene.cuh" />
+    <ClInclude Include="src\extra.cuh" />
   </ItemGroup>
 </Project>
