@@ -37,15 +37,53 @@ namespace rtw
 		scene.initializeScene(camera);
 	}
 
-	__global__ void renderRayKernel(float* buffer, Camera camera, Scene scene)
+	__global__ void initRandomKernel(curandState* state, int stateSize, int seed)
+	{
+		int thread = threadIdx.x + blockIdx.x * blockDim.x;
+		if (thread >= stateSize)
+		{
+			return;
+		}
+
+		// set same seed difference sequence for each thread
+		curand_init(seed, thread, 0, &state[thread]);
+	}
+
+	__global__ void renderRayKernel(float* buffer, Camera camera, Scene scene, curandState* randStates)
 	{
 		int strideX = blockDim.x * gridDim.x;
+		int thread = threadIdx.x + blockIdx.x * blockDim.x;
+		curandState* randState = &randStates[thread];
 
-		for (int pixel = threadIdx.x + blockIdx.x * blockDim.x; pixel < camera.totalPixels(); pixel += strideX)
+		for (int pixel = thread; pixel < camera.totalPixels(); pixel += strideX)
 		{
-			Ray ray = camera.getRayFromPixelIndex(pixel);
+			Vec3 worldPos = camera.getWorldPosFromPixelIndex(pixel);
 
-			Vec3 color{ scene.getColor(ray) };
+			Vec3 cameraPos = camera.cameraPosition();
+			float deltaU = camera.deltaU();
+			float deltaV = camera.deltaV();
+
+			Vec3 color{};
+
+			for (int i = 0; i < camera.nSamples(); ++i)
+			{
+				// Sample a random location inside the square halfway between the pixel position
+				// and the positions of neighboring pixels
+				Vec3 samplePos{ worldPos };
+				samplePos[0] += deltaU * (randomFloat(randState) - 0.5f);
+				samplePos[1] += deltaV * (randomFloat(randState) - 0.5f);
+
+				Ray ray{ camera.cameraPosition(), samplePos - camera.cameraPosition() };
+
+				color += scene.getColor(ray, camera.nBounces(), randState);
+			}
+
+			color *= 1.0f / camera.nSamples();
+
+
+			/*Ray ray = camera.getRayFromPixelIndex(pixel);
+
+			Vec3 color{ scene.getColor(ray, &randStates[thread]) };*/
 
 			// Write color to buffer
 			int index = 3 * pixel;
@@ -55,11 +93,19 @@ namespace rtw
 		}
 	}
 
-	std::vector<float> rtw::renderGPU(int width, int height, int channels, int numSpheres)
-	{
-		// Camera
-		const Camera camera{ width, height };
-		
+	std::vector<float> rtw::renderGPU(const Camera& camera, int numSpheres)
+	{		
+		// Want number of threads per block to be multiple of 32
+		// will have to experiment with optimal amount
+		// also will want to clamp the max num of blocks for high resolutions
+		constexpr int threadsPerBlock{ 512 };
+		const int blocks{ camera.totalPixels() / threadsPerBlock + 1 };
+
+		// Allocate memory for the frame buffer
+		float* buffer{};
+		const size_t bufferSize{ static_cast<size_t>(camera.totalPixels() * camera.nChannels()) };
+		CHECK(cudaMallocManaged(&buffer, bufferSize * sizeof(float)));
+
 		// Allocate memory and initialize scene on device
 		Sphere* spheres{};
 		CHECK(cudaMalloc(&spheres, numSpheres * sizeof(Sphere)));
@@ -68,19 +114,16 @@ namespace rtw
 		CHECK(cudaGetLastError());
 		CHECK(cudaDeviceSynchronize());
 		
-		// Allocate memory for the frame buffer
-		float* buffer{};
-		const size_t bufferSize{ static_cast<size_t>(width * height * channels) };
-		CHECK(cudaMallocManaged(&buffer, bufferSize * sizeof(float)));
-
-		// Want number of threads per block to be multiple of 32
-		// will have to experiment with optimal amount
-		// also will want to clamp the max num of blocks for high resolutions
-		constexpr int threadsPerBlock{ 64 };
-		const int blocks{ (width * height) / threadsPerBlock + 1 };
+		// Allocate memory and initialize rand states for each thread
+		const int threadCount = threadsPerBlock * blocks;
+		curandState* randStates{};
+		CHECK(cudaMalloc(&randStates, threadCount * sizeof(curandState)));
+		initRandomKernel << <blocks, threadsPerBlock >> > (randStates, threadCount, 1337);
+		CHECK(cudaGetLastError());
+		CHECK(cudaDeviceSynchronize());
 
 		// Render the frame
-		renderRayKernel << <blocks, threadsPerBlock >> > (buffer, camera, scene);
+		renderRayKernel << <blocks, threadsPerBlock >> > (buffer, camera, scene, randStates);
 		CHECK(cudaGetLastError());
 		CHECK(cudaDeviceSynchronize());
 
@@ -89,8 +132,9 @@ namespace rtw
 		data.assign(buffer, buffer + bufferSize);
 
 		// Release device memory
-		CHECK(cudaFree(buffer));
 		CHECK(cudaFree(spheres));
+		CHECK(cudaFree(randStates));
+		CHECK(cudaFree(buffer));
 
 		return data;
 	}

@@ -12,13 +12,23 @@ namespace rtw
 
 		__host__ __device__ Camera() {}
 
-		__host__ __device__ Camera(int screenWidth, int screenHeight)
-			: screenWidth_{ screenWidth }, screenHeight_{ screenHeight } {}
+		__host__ __device__ Camera(int screenWidth, int screenHeight, int nChannels, int nSamples, int nBounces)
+			: screenWidth_{ screenWidth }, screenHeight_{ screenHeight }, nChannels_{ nChannels },
+			nSamples_{ nSamples }, nBounces_{ nBounces } {}
 
 		__host__ __device__ int totalPixels() const { return totalPixels_; }
 
-		Vec3 cameraPosition() const { return cameraPos_; }
-		Vec3 viewOrigin() const { return pixelOrigin_; }
+		__host__ __device__ int nChannels() const { return nChannels_; }
+
+		__host__ __device__ int nSamples() const { return nSamples_; }
+
+		__host__ __device__ int nBounces() const { return nBounces_; }
+
+		__host__ __device__ Vec3 cameraPosition() const { return cameraPos_; }
+		__host__ __device__ Vec3 viewOrigin() const { return pixelOrigin_; }
+
+		__host__ __device__ float deltaU() const { return deltaU_; }
+		__host__ __device__ float deltaV() const { return deltaV_; }
 
 		__host__ __device__ Vec3 normalizedScreenToWorld(float x, float y) const
 		{
@@ -77,6 +87,17 @@ namespace rtw
 			return ray;
 		}
 
+		__host__ __device__ Vec3 getWorldPosFromPixelIndex(int index) const
+		{
+			// pixel offsets in world units (avoiding division entirely)
+			int y = static_cast<int>(index * recipWidth_);
+			float px = (index - y * screenWidth_) * deltaU_;
+			float py = y * deltaV_;
+
+			// Get the world space postition of the pixel
+			return Vec3{ pixelOrigin_.x() + px, pixelOrigin_.y() -py, pixelOrigin_.z() };
+		}
+
 	private:
 
 		// Screen Properties
@@ -84,6 +105,11 @@ namespace rtw
 		int screenHeight_{ 600 };
 		int totalPixels_{ screenWidth_ * screenHeight_ };
 		float recipWidth_{ 1.0f / screenWidth_ };
+
+		// Sample Properties
+		int nChannels_{ 3 };
+		int nSamples_{ 1 };
+		int nBounces_{ 5 };
 
 		// Camera Properties
 		Vec3 cameraPos_{ 0.0f, 0.0f, 0.0f };

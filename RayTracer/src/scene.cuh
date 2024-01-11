@@ -45,48 +45,106 @@ namespace rtw
 
 		__host__ __device__ void clear() { sceneView_.clear(); }
 
-		__host__ __device__ Vec3 getColor(Ray ray) const
+		__host__ __device__ Vec3 getColor(Ray ray, int nBounces, curandState* randState) const
 		{
 			HitResult result{};
-			float closestT{ 1000000.0f };
 
-			Vec3 color{ 0.9f, 0.9f, 1.0f };
+			Vec3 attenuation{ 1.0f, 1.0f, 1.0f };
 
-			for (const auto& sphere : sceneView_)
+			for (int i = 0; i <= nBounces; ++i)
 			{
-				if (sphere.hitInline(ray, result) && result.t < closestT)
+				// Find the closest hit
+				const Sphere* closestSphere{ nullptr };
+				float closestT{ 1000000.0f };
+
+				for (const auto& sphere : sceneView_)
 				{
-					color = result.getNormalColor();
-					closestT = result.t;
+					if (sphere.hit(ray, result) && result.t < closestT)
+					{
+						closestSphere = &sphere;
+						closestT = result.t;
+					}
+				}
+
+				if (closestSphere)
+				{
+					// Hit something, apply attenuation and get the next bounce direction
+					// Absorb half the light
+					//attenuation *= 0.5f;
+
+					//color = sphere.getColor(ray, result, randState);
+					BounceResult bResult = closestSphere->bounceRay(ray, closestT, randState);
+					ray = bResult.bounceRay;
+					attenuation *= bResult.attenuation;
+				}
+				else
+				{
+					// ray failed to hit anything return the accumulated color
+					// Could make this a gradient
+					//Vec3 ambientColor{ 0.5f, 0.7f, 1.0f };
+
+					// lerp the ambient light depending of the direction of the final ray
+					// seems to produce a nice daylight effect
+					float lerpT = 0.5f * (ray.direction().y() + 1.0f);
+
+					Vec3 ambientColor = (1.0f - lerpT) * Vec3(1.0f, 1.0f, 1.0f) + lerpT * Vec3( 0.5f, 0.7f, 1.0f );
+
+					// Apply cumulative attenuation
+					ambientColor *= attenuation;
+
+					return ambientColor;
 				}
 			}
 
-			return color;
+			// Max number of bounces reached return no contribution
+			return Vec3{0.0f, 0.0f, 0.0f};
 		}
 
 		__host__ __device__ void initializeScene(Camera camera)
 		{
-			int reserved{ 1 };
+			//int reserved{ 1 };
+
+			//auto sphere = sceneView_.begin();
+
+			//Material material{ Vec3{ 0.9f, 0.5f, 0.5f }, 0.0f };
+
+			//// "Ground"
+			//*sphere = Sphere{ 0.0f, -150.1f, -13.0f, 150.0f, Material{ Vec3{ 0.4f, 0.6f, 0.4f }, 1.0f } };
+			//sphere++;
+
+			//// distribute remaining spheres across the screen
+			//float scaleFactor = 1.0f / (1 + sceneView_.end() - sphere);
+			//float r = 0.5f / (sceneView_.end() - sphere);
+
+			//for (int i = 0; sphere < sceneView_.end(); ++sphere, ++i)
+			//{
+			//	float x = static_cast<float>(i + 1) * scaleFactor;
+			//	float y = static_cast<float>(i + 1) * scaleFactor;
+
+			//	Vec3 center = camera.normalizedScreenToWorld(x, y);
+
+			//	sceneView_[i + reserved] = Sphere{ center, r, material };
+
+			//	material.roughness = 1.0f;
+			//}
 
 			auto sphere = sceneView_.begin();
-
-			// "Ground"
-			*sphere = Sphere{ 0.0f, -150.0f, -20.0f, 150.0f };
+			*sphere = Sphere{ 0.0f, -100.5f, -1.0f, 100.0f, Material{ Vec3{ 0.8f, 0.8f, 0.0f }, BlendMode::diffuse, 1.0f } };
+			sphere++;
+			*sphere = Sphere{ 0.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.1f, 0.2f, 0.5f }, BlendMode::diffuse} };
+			sphere++;
+			*sphere = Sphere{ 1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.8f, 0.6f, 0.2f }, BlendMode::metallic, 0.0f } };
+			sphere++;
+			*sphere = Sphere{ 0.35f, -0.3f, -0.5f, 0.1f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::metallic, 0.3f } };
 			sphere++;
 
-			// distribute remaining spheres across the screen
-			float scaleFactor = 1.0f / (1 + sceneView_.end() - sphere);
-			float r = 0.5f / (sceneView_.end() - sphere);
+			// Hollow glass
+			*sphere = Sphere{ -1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+			sphere++;
+			*sphere = Sphere{ -1.0f, 0.0f, -1.0f, -0.4f, Material{ Vec3{ 0.9f, 0.9f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+			sphere++;
 
-			for (int i = 0; sphere < sceneView_.end(); ++sphere, ++i)
-			{
-				float x = static_cast<float>(i + 1) * scaleFactor;
-				float y = static_cast<float>(i + 1) * scaleFactor;
-
-				Vec3 center = camera.normalizedScreenToWorld(x, y);
-
-				sceneView_[i + reserved] = Sphere{ center, r };
-			}
+			*sphere = Sphere{ -0.35f, -0.3f, -0.5f, 0.1f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
 		}
 
 	private:

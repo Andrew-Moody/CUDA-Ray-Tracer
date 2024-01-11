@@ -27,8 +27,6 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\raytracing.cu" />
-    <CudaCompile Include="src\camera.cu" />
-    <CudaCompile Include="src\sphere.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\image.h">
@@ -45,5 +43,6 @@
     <ClInclude Include="src\sphere.cuh" />
     <ClInclude Include="src\scene.cuh" />
     <ClInclude Include="src\extra.cuh" />
+    <ClInclude Include="src\random.cuh" />
   </ItemGroup>
 </Project>

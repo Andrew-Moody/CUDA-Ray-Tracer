@@ -3,10 +3,10 @@
 #include <vector>
 #include <string>
 #include <memory>
-
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -45,7 +45,8 @@ void demo::storePNG(const std::string& filepath, const std::vector<float>& data,
 	int i = 0;
 	for (float value : data)
 	{
-		uintData[i++] = static_cast<stbi_uc>(255 * value);
+		// The square root serves to convert from linear space to gamma space
+		uintData[i++] = static_cast<stbi_uc>(255 * std::sqrt(value));
 	}
 
 	if (!stbi_write_png(filepath.c_str(), width, height, channels, uintData.data(), channels * width))
@@ -95,19 +96,6 @@ std::vector<float> demo::renderTestCPU(int width, int height, int channels)
 	size_t bufferSize = width * height * channels;
 
 	std::vector<float> data(bufferSize);
-
-	/*for (int j = 0; j < height; ++j)
-	{
-		for (int i = 0; i < width; ++i)
-		{
-			int pixel = 3 * (j * width + i);
-
-			data[pixel] = float(i) / width;
-			data[pixel + 1] = float(j) / height;
-			data[pixel + 2] = 0.2f;
-		}
-	}*/
-
 
 	for (int pIdx = 0; pIdx < width * height; ++pIdx)
 	{

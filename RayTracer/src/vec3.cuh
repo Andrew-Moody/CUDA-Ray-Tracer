@@ -43,6 +43,14 @@ namespace rtw
 			return *this;
 		}
 
+		// element wise multiplication (nice for color attenuation)
+		__host__ __device__ Vec3& operator*=(const Vec3& other)
+		{
+			values[0] *= other.values[0];
+			values[1] *= other.values[1];
+			values[2] *= other.values[2];
+			return *this;
+		}
 
 		__host__ __device__ float length_squared() const
 		{
@@ -52,6 +60,12 @@ namespace rtw
 		__host__ __device__ float length() const
 		{
 			return std::sqrt(length_squared());
+		}
+
+		__host__ __device__ Vec3& normalize()
+		{
+			*this *= 1.0f / std::sqrt(length_squared());
+			return *this;
 		}
 
 		__host__ __device__ friend float dot(const Vec3& a, const Vec3& b);
