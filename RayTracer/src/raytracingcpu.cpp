@@ -18,7 +18,7 @@ namespace rtw
 		// Create a scene for cpu
 		std::unique_ptr<Sphere[]> spheres{ new Sphere[numSpheres] };
 		Scene scene{ spheres.get(), spheres.get() + numSpheres };
-		scene.initializeScene(camera);
+		scene.initializeScene(camera, nullptr);
 
 		// frame buffer
 		const int size{ camera.totalPixels() * camera.nChannels() };
@@ -30,21 +30,18 @@ namespace rtw
 		{
 			Vec3 worldPos = camera.getWorldPosFromPixelIndex(pixel);
 
-			Vec3 cameraPos = camera.cameraPosition();
-			float deltaU = camera.deltaU();
-			float deltaV = camera.deltaV();
-
 			Vec3 color{};
 
 			for (int i = 0; i < camera.nSamples(); ++i)
 			{
+				// sample defocus disk
+				Vec3 rayOrigin = camera.getSampleOrigin(nullptr);
+
 				// Sample a random location inside the square halfway between the pixel position
 				// and the positions of neighboring pixels
-				Vec3 samplePos{ worldPos };
-				samplePos[0] += deltaU * ( randomFloat(nullptr) - 0.5f );
-				samplePos[1] += deltaV * ( randomFloat(nullptr) - 0.5f );
+				Vec3 samplePos = camera.shiftWorldPos(worldPos, randomFloat(nullptr) - 0.5f, randomFloat(nullptr) - 0.5f);
 
-				Ray ray{ camera.cameraPosition(), samplePos - camera.cameraPosition() };
+				Ray ray{ rayOrigin, samplePos - rayOrigin };
 
 				color += scene.getColor(ray, camera.nBounces(), nullptr);
 			}

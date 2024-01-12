@@ -3,6 +3,7 @@
 
 #include "vec3.cuh"
 #include "ray.cuh"
+#include "random.cuh"
 
 namespace rtw
 {
@@ -29,6 +30,78 @@ namespace rtw
 
 		__host__ __device__ float deltaU() const { return deltaU_; }
 		__host__ __device__ float deltaV() const { return deltaV_; }
+
+		__host__ void setFocus(float fov, float focalLength, float fNumber = 1000000.0f)
+		{
+			fov_ = fov;
+			focalLength_ = focalLength; // Distance from Camera to viewport
+			fNumber_ = fNumber;
+			lensBasisU_ = cameraRight_ * (focalLength * 0.5f / fNumber_);
+			lensBasisV_ = cameraUp_ * (focalLength * 0.5f / fNumber_);
+
+			updateView();
+		}
+
+		__host__ void setTransform(float x, float y, float z, float lx, float ly, float lz)
+		{
+			/*cameraPos_ = { x, y, z };
+			cameraForward_ = { lx, ly, lz };
+			cameraForward_.normalize();*/
+
+			cameraPos_ = { x, y, z };
+			Vec3 lookat{ lx, ly, lz };
+
+			Vec3 lookVec = lookat - cameraPos_;
+			focalLength_ = lookVec.length();
+			cameraForward_ = normalized(lookVec);
+
+			// Assume up direction is near global up
+			// if forward is near vertical use +/- global forward instead
+			Vec3 upGuess{ 0.0f, 1.0f, 0.0f };
+
+			float d = dot(cameraForward_, upGuess);
+
+			if (d > 0.9f)
+			{
+				upGuess = { 0.0f, 0.0f, -1.0f };
+			}
+			else if (d < -0.9f)
+			{
+				upGuess = { 0.0f, 0.0f, 1.0f };
+			}
+
+			// Get unit vector orthogonal to forward and up
+			cameraRight_ = cross(cameraForward_, upGuess);
+			cameraRight_.normalize();
+
+			// Get the true up direction orthogonal to forward and right
+			cameraUp_ = cross(cameraRight_, cameraForward_);
+
+			//// Get unit vector orthogonal to forward and up
+			//cameraRight_ = cross(upGuess, cameraForward_);
+			//cameraRight_.normalize();
+
+			//// Get the true up direction orthogonal to forward and right
+			//cameraUp_ = cross(cameraForward_, cameraRight_);
+
+			updateView();
+		}
+
+		__host__ void updateView()
+		{
+			viewHeight_ = 2.0f * focalLength_ * std::tan(fov_ * static_cast<float>(std::_Pi) / 360.0f);
+			viewWidth_ = viewHeight_ * aspectRatio_;
+
+			deltaU_ = viewWidth_ / screenWidth_;
+			deltaV_ = viewHeight_ / screenHeight_;
+
+			viewBasisU_ = deltaU_ * cameraRight_;
+			viewBasisV_ = deltaV_ * cameraUp_;
+
+			viewCenter_ = cameraPos_ + cameraForward_ * focalLength_;
+			viewOrigin_ = viewCenter_ + 0.5f * ((cameraUp_ * viewHeight_) - (cameraRight_ * viewWidth_));
+			pixelOrigin_ = viewOrigin_ + 0.5f * (viewBasisU_ - viewBasisV_);
+		}
 
 		__host__ __device__ Vec3 normalizedScreenToWorld(float x, float y) const
 		{
@@ -90,13 +163,61 @@ namespace rtw
 		__host__ __device__ Vec3 getWorldPosFromPixelIndex(int index) const
 		{
 			// pixel offsets in world units (avoiding division entirely)
-			int y = static_cast<int>(index * recipWidth_);
+			/*float y = static_cast<int>(index * recipWidth_);
 			float px = (index - y * screenWidth_) * deltaU_;
-			float py = y * deltaV_;
+			float py = y * deltaV_;*/
 
 			// Get the world space postition of the pixel
-			return Vec3{ pixelOrigin_.x() + px, pixelOrigin_.y() -py, pixelOrigin_.z() };
+			//return Vec3{ pixelOrigin_.x() + px, pixelOrigin_.y() -py, pixelOrigin_.z() };
+
+
+			Point2D point = getPixelCoordFromIndex(index);
+			return pixelOrigin_ + (point.x * viewBasisU_) - (point.y * viewBasisV_);
 		}
+
+
+		__host__ __device__ Point2D getPixelCoordFromIndex(int index) const
+		{
+			// Truncate the result of "dividing" index by number of pixels in a screen row
+			float y{ static_cast<float>(static_cast<int>(index * recipWidth_)) };
+			float x{ index - y * screenWidth_ };
+			return Point2D{ x, y };
+		}
+
+		// Add a screen space shift to a world position (for multisampling)
+		__host__ __device__ Vec3 shiftWorldPos(Vec3 worldPos, float shiftX, float shiftY) const
+		{
+			// +/- should not matter for random sampling purposes
+			//return worldPos + (shiftX * viewBasisU_) - (shiftY * viewBasisV_);
+			return worldPos + (shiftX * viewBasisU_) + (shiftY * viewBasisV_);
+		}
+
+		__host__ __device__ Vec3 getSampleOrigin(curandState* randState) const
+		{
+			/*float shiftX = randomFloat(randState) - 0.5f;
+			float shiftY = randomFloat(randState) - 0.5f;*/
+
+			Vec3 shift{};
+
+			for (;;)
+			{
+				shift[0] = 2.0f * randomFloat(randState) - 1.0f;
+				shift[1] = 2.0f * randomFloat(randState) - 1.0f;
+
+				if (shift.length_squared() <= 1.0f)
+				{
+					// dont normalize want inside unit disk not on edge
+					//shift.normalize();
+					break;
+				}
+			}			
+
+			float shiftX = shift[0];
+			float shiftY = shift[1];
+
+			return cameraPos_ + (shiftX * lensBasisU_) + (shiftY * lensBasisV_);
+		}
+
 
 	private:
 
@@ -118,12 +239,16 @@ namespace rtw
 		Vec3 cameraRight_{ 1.0f, 0.0f, 0.0f };
 
 		float aspectRatio_{ static_cast<float>(screenWidth_) / screenHeight_ };
+		float fov_{ 90.0f };
 		float focalLength_{ 1.0f }; // Distance from Camera to viewport
+		float fNumber_{ 1000000.0f }; // book uses angle but this avoids atan and is a common camera parameter (f-number)
+		Vec3 lensBasisU_{ cameraRight_ * (2.0f / fNumber_) };
+		Vec3 lensBasisV_{ cameraUp_ * (2.0f / fNumber_) };
 
 		// Viewport Properties
-
+		
 		// Size of the viewport (unclear what units, for now assumed to be world units)
-		float viewHeight_{ 2.0f };
+		float viewHeight_{ 2.0f * focalLength_ * std::tan(fov_ * static_cast<float>(std::_Pi) / 360.0f) };
 		float viewWidth_{ viewHeight_ * aspectRatio_ };
 
 		// Distance between pixels in viewport units (ideally should be equal)
@@ -131,8 +256,12 @@ namespace rtw
 		float deltaU_{ viewWidth_ / screenWidth_ };
 		float deltaV_{ viewHeight_ / screenHeight_ };
 
-		Vec3 viewCenter_{ cameraForward_ * focalLength_ }; // Center of the screen in worldspace
+		// pre multiply camera basis vectors by pixel deltas
+		Vec3 viewBasisU_{ deltaU_ * cameraRight_ };
+		Vec3 viewBasisV_{ deltaV_ * cameraUp_ };
+
+		Vec3 viewCenter_{ cameraPos_ + cameraForward_ * focalLength_ }; // Center of the screen in worldspace
 		Vec3 viewOrigin_{ viewCenter_ + 0.5f * ((cameraUp_ * viewHeight_) - (cameraRight_ * viewWidth_)) }; // Topleft of screen in worldspace
-		Vec3 pixelOrigin_{ viewOrigin_ + 0.5f * Vec3(deltaU_, -deltaV_, 0.0f) }; // Offset viewOrigin to the center of the first pixel
+		Vec3 pixelOrigin_{ viewOrigin_ + 0.5f * (viewBasisU_ - viewBasisV_) };// Offset viewOrigin to the center of the first pixel
 	};
 }

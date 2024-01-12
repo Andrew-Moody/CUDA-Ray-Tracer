@@ -7,6 +7,12 @@
 
 namespace rtw
 {
+	struct Point2D
+	{
+		float x;
+		float y;
+	};
+
 	class Vec3
 	{
 	public:
@@ -43,6 +49,15 @@ namespace rtw
 			return *this;
 		}
 
+		__host__ __device__ Vec3& operator/=(float t)
+		{
+			float d = 1.0f / t;
+			values[0] *= d;
+			values[1] *= d;
+			values[2] *= d;
+			return *this;
+		}
+
 		// element wise multiplication (nice for color attenuation)
 		__host__ __device__ Vec3& operator*=(const Vec3& other)
 		{
@@ -64,7 +79,7 @@ namespace rtw
 
 		__host__ __device__ Vec3& normalize()
 		{
-			*this *= 1.0f / std::sqrt(length_squared());
+			*this /= std::sqrt(length_squared());
 			return *this;
 		}
 

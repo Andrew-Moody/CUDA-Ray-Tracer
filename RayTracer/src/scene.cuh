@@ -85,7 +85,7 @@ namespace rtw
 
 					// lerp the ambient light depending of the direction of the final ray
 					// seems to produce a nice daylight effect
-					float lerpT = 0.5f * (ray.direction().y() + 1.0f);
+					float lerpT = 0.5f * (normalized(ray.direction()).y() + 1.0f);
 
 					Vec3 ambientColor = (1.0f - lerpT) * Vec3(1.0f, 1.0f, 1.0f) + lerpT * Vec3( 0.5f, 0.7f, 1.0f );
 
@@ -100,51 +100,94 @@ namespace rtw
 			return Vec3{0.0f, 0.0f, 0.0f};
 		}
 
-		__host__ __device__ void initializeScene(Camera camera)
+		__host__ __device__ void initializeScene(Camera camera, curandState* randState)
 		{
 			//int reserved{ 1 };
 
-			//auto sphere = sceneView_.begin();
+			auto sphere = sceneView_.begin();
 
 			//Material material{ Vec3{ 0.9f, 0.5f, 0.5f }, 0.0f };
 
-			//// "Ground"
-			//*sphere = Sphere{ 0.0f, -150.1f, -13.0f, 150.0f, Material{ Vec3{ 0.4f, 0.6f, 0.4f }, 1.0f } };
+			// Ground
+			*sphere = Sphere{ 0.0f, -1000.0f, 0.0f, 1000.0f, Material{ Vec3{ 0.5f, 0.5f, 0.5f }, BlendMode::diffuse } };
+			sphere++;
+
+			// Final render
+			*sphere = Sphere{ 0.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+			sphere++;
+			*sphere = Sphere{ -4.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 0.4f, 0.2f, 0.1f }, BlendMode::diffuse} };
+			sphere++;
+			*sphere = Sphere{ 4.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 0.7f, 0.6f, 0.5f }, BlendMode::metallic, 0.0f } };
+			sphere++;
+
+			int count{};
+
+			for (int x = -11; x < 11; ++x)
+			{
+				for (int z = -11; z < 11; ++z)
+				{
+					float radius = 0.2f;
+					Vec3 center{ x + 0.9f * randomFloat(randState), radius, z + 0.9f * randomFloat(randState) };
+					
+					if ((center - Vec3{ 4.0f, 0.2, 0 }).length() > 0.9f)
+					{
+						float randomMat = randomFloat(randState);
+
+						if (randomMat < 0.75f)
+						{
+							// Diffuse
+							Vec3 albedo = (randomVec(randState) *= randomVec(randState));
+							*sphere = Sphere{ center, radius, Material{ albedo, BlendMode::diffuse } };
+						}
+						else if (randomMat < 0.90f)
+						{
+							// Metallic
+							Vec3 albedo = randomVec(randState) * 0.5f + Vec3{ 0.5f, 0.5f, 0.5f};
+							*sphere = Sphere{ center, radius, Material{ albedo, BlendMode::metallic, randomFloat(randState) * 0.5f } };
+						}
+						else
+						{
+							// Glass
+							*sphere = Sphere{ center, radius, Material{ { 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+						}
+					}
+					else
+					{
+						// hide rather deal with dynamic memory for now
+						*sphere = Sphere{};
+						sphere->visible = false;
+					}
+
+					sphere++;
+					count++;
+				}
+			}
+
+			sphere++;
+
+			// Chapter 13 scene
+			//*sphere = Sphere{ 0.0f, -100.5f, -1.0f, 100.0f, Material{ Vec3{ 0.8f, 0.8f, 0.0f }, BlendMode::diffuse, 1.0f } };
+			//sphere++;
+			//*sphere = Sphere{ 0.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.1f, 0.2f, 0.5f }, BlendMode::diffuse} };
+			//sphere++;
+			//*sphere = Sphere{ 1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.8f, 0.6f, 0.2f }, BlendMode::metallic, 0.0f } };
 			//sphere++;
 
-			//// distribute remaining spheres across the screen
-			//float scaleFactor = 1.0f / (1 + sceneView_.end() - sphere);
-			//float r = 0.5f / (sceneView_.end() - sphere);
+			//// Hollow glass
+			//*sphere = Sphere{ -1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+			//sphere++;
+			//*sphere = Sphere{ -1.0f, 0.0f, -1.0f, -0.4f, Material{ Vec3{ 0.9f, 0.9f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+			//sphere++;
 
-			//for (int i = 0; sphere < sceneView_.end(); ++sphere, ++i)
-			//{
-			//	float x = static_cast<float>(i + 1) * scaleFactor;
-			//	float y = static_cast<float>(i + 1) * scaleFactor;
+			//// Extra
+			//*sphere = Sphere{ -0.35f, -0.3f, -0.5f, 0.1f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+			//sphere++;
+			//*sphere = Sphere{ 0.35f, -0.3f, -0.5f, 0.1f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::metallic, 0.3f } };
+		}
 
-			//	Vec3 center = camera.normalizedScreenToWorld(x, y);
-
-			//	sceneView_[i + reserved] = Sphere{ center, r, material };
-
-			//	material.roughness = 1.0f;
-			//}
-
-			auto sphere = sceneView_.begin();
-			*sphere = Sphere{ 0.0f, -100.5f, -1.0f, 100.0f, Material{ Vec3{ 0.8f, 0.8f, 0.0f }, BlendMode::diffuse, 1.0f } };
-			sphere++;
-			*sphere = Sphere{ 0.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.1f, 0.2f, 0.5f }, BlendMode::diffuse} };
-			sphere++;
-			*sphere = Sphere{ 1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.8f, 0.6f, 0.2f }, BlendMode::metallic, 0.0f } };
-			sphere++;
-			*sphere = Sphere{ 0.35f, -0.3f, -0.5f, 0.1f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::metallic, 0.3f } };
-			sphere++;
-
-			// Hollow glass
-			*sphere = Sphere{ -1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
-			sphere++;
-			*sphere = Sphere{ -1.0f, 0.0f, -1.0f, -0.4f, Material{ Vec3{ 0.9f, 0.9f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
-			sphere++;
-
-			*sphere = Sphere{ -0.35f, -0.3f, -0.5f, 0.1f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+		__host__ __device__ Vec3 randomVec(curandState* randstate)
+		{
+			return { randomFloat(randstate), randomFloat(randstate), randomFloat(randstate) };
 		}
 
 	private:

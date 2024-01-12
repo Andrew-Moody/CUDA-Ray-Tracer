@@ -34,7 +34,10 @@ namespace rtw
 			return;
 		}
 
-		scene.initializeScene(camera);
+		curandState randState;
+		curand_init(1234, 0, 0, &randState);
+
+		scene.initializeScene(camera, &randState);
 	}
 
 	__global__ void initRandomKernel(curandState* state, int stateSize, int seed)
@@ -59,21 +62,18 @@ namespace rtw
 		{
 			Vec3 worldPos = camera.getWorldPosFromPixelIndex(pixel);
 
-			Vec3 cameraPos = camera.cameraPosition();
-			float deltaU = camera.deltaU();
-			float deltaV = camera.deltaV();
-
 			Vec3 color{};
 
 			for (int i = 0; i < camera.nSamples(); ++i)
 			{
+				// sample defocus disk
+				Vec3 rayOrigin = camera.getSampleOrigin(randState);
+
 				// Sample a random location inside the square halfway between the pixel position
 				// and the positions of neighboring pixels
-				Vec3 samplePos{ worldPos };
-				samplePos[0] += deltaU * (randomFloat(randState) - 0.5f);
-				samplePos[1] += deltaV * (randomFloat(randState) - 0.5f);
+				Vec3 samplePos = camera.shiftWorldPos(worldPos, randomFloat(randState) - 0.5f, randomFloat(randState) - 0.5f);
 
-				Ray ray{ camera.cameraPosition(), samplePos - camera.cameraPosition() };
+				Ray ray{ rayOrigin, samplePos - rayOrigin };
 
 				color += scene.getColor(ray, camera.nBounces(), randState);
 			}
@@ -98,7 +98,7 @@ namespace rtw
 		// Want number of threads per block to be multiple of 32
 		// will have to experiment with optimal amount
 		// also will want to clamp the max num of blocks for high resolutions
-		constexpr int threadsPerBlock{ 512 };
+		constexpr int threadsPerBlock{ 1024 };
 		const int blocks{ camera.totalPixels() / threadsPerBlock + 1 };
 
 		// Allocate memory for the frame buffer

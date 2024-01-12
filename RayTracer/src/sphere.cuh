@@ -34,6 +34,7 @@ namespace rtw
 	class Sphere// : public Hittable
 	{
 	public:
+		bool visible{ true };
 
 		__host__ __device__ Sphere() {}
 
@@ -45,6 +46,11 @@ namespace rtw
 
 		__host__ __device__ bool hit(Ray ray, HitResult& outResult) const
 		{
+			if (!visible)
+			{
+				return false;
+			}
+
 			// Return the distance along the ray where a hit occured
 			// Slightly simplified by using half b to reduce the factor of 2
 			Vec3 orig = ray.origin();
