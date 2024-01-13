@@ -102,25 +102,20 @@ namespace rtw
 
 		__host__ __device__ void initializeScene(Camera camera, curandState* randState)
 		{
-			//int reserved{ 1 };
-
 			auto sphere = sceneView_.begin();
 
-			//Material material{ Vec3{ 0.9f, 0.5f, 0.5f }, 0.0f };
+			// Final render
 
 			// Ground
 			*sphere = Sphere{ 0.0f, -1000.0f, 0.0f, 1000.0f, Material{ Vec3{ 0.5f, 0.5f, 0.5f }, BlendMode::diffuse } };
 			sphere++;
 
-			// Final render
 			*sphere = Sphere{ 0.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
 			sphere++;
 			*sphere = Sphere{ -4.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 0.4f, 0.2f, 0.1f }, BlendMode::diffuse} };
 			sphere++;
 			*sphere = Sphere{ 4.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 0.7f, 0.6f, 0.5f }, BlendMode::metallic, 0.0f } };
 			sphere++;
-
-			int count{};
 
 			for (int x = -11; x < 11; ++x)
 			{
@@ -159,14 +154,13 @@ namespace rtw
 					}
 
 					sphere++;
-					count++;
 				}
 			}
 
-			sphere++;
+			//sphere++;
 
-			// Chapter 13 scene
-			//*sphere = Sphere{ 0.0f, -100.5f, -1.0f, 100.0f, Material{ Vec3{ 0.8f, 0.8f, 0.0f }, BlendMode::diffuse, 1.0f } };
+			//// Chapter 13 scene
+			//*sphere = Sphere{ 0.0f, -100.5f, -1.0f, 100.0f, Material{ Vec3{ 0.8f, 0.8f, 0.4f }, BlendMode::diffuse, 1.0f } };
 			//sphere++;
 			//*sphere = Sphere{ 0.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.1f, 0.2f, 0.5f }, BlendMode::diffuse} };
 			//sphere++;
@@ -176,13 +170,20 @@ namespace rtw
 			//// Hollow glass
 			//*sphere = Sphere{ -1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
 			//sphere++;
-			//*sphere = Sphere{ -1.0f, 0.0f, -1.0f, -0.4f, Material{ Vec3{ 0.9f, 0.9f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+			//*sphere = Sphere{ -1.0f, 0.0f, -1.0f, -0.4f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
 			//sphere++;
+			//
 
-			//// Extra
-			//*sphere = Sphere{ -0.35f, -0.3f, -0.5f, 0.1f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
+			//// Extras for custom example
+			//// Diamond
+			//*sphere = Sphere{ -0.1f, 0.25f, -0.25f, 0.35f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 2.4f } };
 			//sphere++;
-			//*sphere = Sphere{ 0.35f, -0.3f, -0.5f, 0.1f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::metallic, 0.3f } };
+			//// Copper
+			//*sphere = Sphere{ -0.5f, 0.5f, -2.0f, 0.35f, Material{ Vec3{ 1.0f, 0.4f, 0.2f }, BlendMode::metallic, 0.0f } };
+			//sphere++;
+			//// Ruby
+			//*sphere = Sphere{ 1.0f, -.35f, 0.0f, 0.15f, Material{ Vec3{ 1.0f, 0.5f, 0.5f }, BlendMode::translucent, 0.0f, 1.8f } };
+
 		}
 
 		__host__ __device__ Vec3 randomVec(curandState* randstate)
