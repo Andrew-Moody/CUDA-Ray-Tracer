@@ -18,7 +18,7 @@ namespace rtw
 		// Create a scene for cpu
 		std::unique_ptr<Sphere[]> spheres{ new Sphere[numSpheres] };
 		Scene scene{ spheres.get(), spheres.get() + numSpheres };
-		scene.initializeScene(camera, nullptr);
+		scene.initializeScene(nullptr);
 
 		// frame buffer
 		const int size{ camera.totalPixels() * camera.nChannels() };
@@ -41,7 +41,7 @@ namespace rtw
 				// and the positions of neighboring pixels
 				Vec3 samplePos = camera.shiftWorldPos(worldPos, randomFloat(nullptr) - 0.5f, randomFloat(nullptr) - 0.5f);
 
-				Ray ray{ rayOrigin, samplePos - rayOrigin };
+				Ray ray{ rayOrigin, (samplePos - rayOrigin).normalize() };
 
 				color += scene.getColor(ray, camera.nBounces(), nullptr);
 			}
@@ -54,6 +54,27 @@ namespace rtw
 			imageData[pixelIdx + 2] = color[2];
 		}
 
+		//double percent{ Sphere::behindCount / static_cast<double>(Sphere::checkCount) };
+		//std::cout << "Total: " << Sphere::checkCount << ", Behind: " << Sphere::behindCount << ", Percent: " << percent << '\n';
+
+		/*double stdDev = std::sqrt(Sphere::accSqrError / (Sphere::sampleCount - 1));
+
+		double bouncesPSample = Sphere::bounceCount / static_cast<double>(Sphere::sampleCount);
+
+		double maxBounceFrac = Sphere::maxBounceCount / static_cast<double>(Sphere::sampleCount);
+
+		std::cout << "Color Checks: " << Sphere::sampleCount << ", Bounces: " << Sphere::bounceCount << ", Average Bounces: " << bouncesPSample <<
+			", Max Bounce Fraction: " << maxBounceFrac << ", Std Deviation: " << stdDev << '\n';*/
+
 		return imageData;
 	}
+
+	/*double Sphere::mean{ 1.74153 };
+
+	uint64_t Sphere::checkCount{};
+	uint64_t Sphere::behindCount{};
+	uint64_t Sphere::sampleCount{};
+	uint64_t Sphere::bounceCount{};
+	uint64_t Sphere::maxBounceCount{};
+	double Sphere::accSqrError{};*/
 }

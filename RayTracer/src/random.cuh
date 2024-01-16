@@ -12,7 +12,7 @@ namespace rtw
 #ifndef __CUDA_ARCH__
 
 		static std::uniform_real_distribution<float> distribution(0.0f, 1.0f);
-		static std::mt19937 generator;
+		static std::mt19937 generator(5489); // 5489 traditional default
 
 		return distribution(generator);
 

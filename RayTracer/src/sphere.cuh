@@ -44,61 +44,67 @@ namespace rtw
 		__host__ __device__ Sphere(const Vec3& center, float radius, Material material)
 			: center_{ center }, radius_{ radius }, material_{material} {}
 
-		__host__ __device__ bool hit(Ray ray, HitResult& outResult) const
+		__host__ __device__ float checkHit(Ray ray) const
 		{
-			if (!visible)
+			/*if (!visible)
 			{
-				return false;
-			}
+				return 0.0f;
+			}*/
 
-			// Return the distance along the ray where a hit occured
-			// Slightly simplified by using half b to reduce the factor of 2
-			Vec3 orig = ray.origin();
-			Vec3 dir = ray.direction();
-			//Vec3 dir = normalized(ray.direction());
-			Vec3 diff = orig - center_;
+//#ifndef __CUDA_ARCH__
+//			Sphere::checkCount++;
+//#endif
+			
 
-			float rsqr = radius_ * radius_;
+			// Reversed the order since we want negative b/2 eventually
+			Vec3 diff = center_ - ray.origin();
+			//float a = dot(ray.direction(), ray.direction()); // direction is unit length
+			float minusHalfB = ray.direction().dot(diff);
 
-			float a = dot(dir, dir);
-			float half_b = dot(dir, diff);
-			float c = diff.length_squared() - rsqr;
+			// check if the sphere center is "behind" the ray origin
+//			if (minusHalfB < 0.0f)
+//			{
+//				// the only time a sphere center can be behind the origin and still intersect at
+//				// a positive t is if the ray originates inside the sphere (but not on the surface due to refraction)
+//				// the only time this should happen is if two spheres are more than half overlapped
+//				// or a sphere is overlapping the camera
+//				// if a glass sphere greatly overlaps any other sphere you would need to 
+//				// also check if the distance from origin to center is less than the radius (with some tolerance
+//				// to exclude the surface of the sphere the ray is bouncing from)
+//#ifndef __CUDA_ARCH__
+//				Sphere::behindCount++;
+//#endif
+//				return 0.0f;
+//			}
 
-			float discr = half_b * half_b - (a * c);
+			float c = diff.length_squared() - radiusSquared_;
+
+			float discr = minusHalfB * minusHalfB - c;
 
 			if (discr < 0.0f)
 			{
-				return false;
+				return 0.0f;
 			}
 
-			// first assume the smallest value is the closest to the origin
-			// not checking the other value means you wont get refracted rays detecting hits from inside
-			// transparent materials
-			float t = (-half_b - std::sqrt(discr)) / a;
+			float sqrtDiscr = std::sqrt(discr);
 
-			// If it is negative it means the intersection along the ray in the opposite direction it was cast
+			float t = (minusHalfB - sqrtDiscr);
 
-			// Also at very small or zero t values floating point error may make the origin of a bounced
-			// ray slightly bellow the surface leading to an false positive
-			// limiting the smallest value can help
-			// (haven't seen a visibly difference so far)
+			// If t is negative it most likely means the sphere is behind the ray origin
+			// if t is zero it is detecting the point of bounce or refraction
 			if (t < 0.001f)
 			{
-				// Try the other possible value
-				t = (-half_b + std::sqrt(discr)) / a;
+				t = (minusHalfB + sqrtDiscr);
 
 				if (t < 0.001f)
 				{
-					return false;
+					return 0.0f;
 				}
 			}
 
-			outResult.t = t;
-			outResult.point = ray.at(t);
-			outResult.normal = (outResult.point - center_) * (1.0f / radius_);
-
-			return true;
+			return t;
 		}
+
 
 		__host__ __device__ Vec3 getColor(Ray ray, HitResult hitResult, curandState* randState) const
 		{
@@ -228,10 +234,21 @@ namespace rtw
 			return BounceResult{ Ray{ point, fuzzReflectDir }, material_.albedo };
 		}
 
+		/*static uint64_t checkCount;
+		static uint64_t behindCount;
+		static uint64_t sampleCount;
+		static uint64_t bounceCount;
+		static uint64_t maxBounceCount;
+		static double mean;
+		static double accSqrError;*/
+
 	private:
 
 		Vec3 center_{};
 		float radius_{};
+		float radiusSquared_{radius_ * radius_};
 		Material material_{};
 	};
+
+	
 }

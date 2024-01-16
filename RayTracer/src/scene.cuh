@@ -19,19 +19,47 @@ namespace rtw
 
 		__host__ __device__ SceneView(Sphere* begin, Sphere* end) : begin_{ begin }, end_{ end } {}
 
-		__host__ __device__ void clear() { begin_ = nullptr; end_ = nullptr; }
+		__host__ __device__ void clear() { begin_ = nullptr; end_ = nullptr; visibleEnd_ = nullptr; }
 
 		__host__ __device__ Sphere* begin() const { return begin_; }
-		__host__ __device__ Sphere* end() const { return end_; }
+		//__host__ __device__ Sphere* end() const { return end_; }
+		__host__ __device__ Sphere* end() const { return visibleEnd_; }
+		__host__ __device__ Sphere* visibleEnd() const { return visibleEnd_; }
 
 		__host__ __device__ Sphere& operator[](int index) { return begin_[index]; }
 
-		__host__ __device__ size_t count() const { return end_ - begin_; }
+		//__host__ __device__ size_t count() const { return end_ - begin_; }
+		//__host__ __device__ size_t visibleCount() const { return visibleEnd_ - begin_; }
+
+		__host__ __device__ void sortVisible()
+		{
+			// back points to last visible
+			auto back = end_ - 1;
+
+			while (back >= begin_ && !back->visible)
+			{
+				--back;
+			}
+
+			for (auto front = back - 1; front >= begin_; --front)
+			{
+				if (!front->visible)
+				{
+					Sphere temp{ *back };
+					*back = *front;
+					*front = temp;
+					--back;
+				}
+			}
+
+			visibleEnd_ = back + 1; 
+		}
 
 	private:
 
 		Sphere* begin_{};
 		Sphere* end_{};
+		Sphere* visibleEnd_{begin_};
 	};
 
 
@@ -39,14 +67,22 @@ namespace rtw
 	{
 	public:
 
+		__host__ __device__ Scene() {};
+
 		__host__ __device__ Scene(Sphere* begin, Sphere* end) : sceneView_{ begin, end } {}
 
 		__host__ __device__ Scene(SceneView sceneView) : sceneView_{ sceneView } {}
 
 		__host__ __device__ void clear() { sceneView_.clear(); }
 
+		__host__ __device__ void sortVisible() { sceneView_.sortVisible(); }
+
 		__host__ __device__ Vec3 getColor(Ray ray, int nBounces, curandState* randState) const
 		{
+
+//#ifndef __CUDA_ARCH__
+//			Sphere::sampleCount++;
+//#endif
 			HitResult result{};
 
 			Vec3 attenuation{ 1.0f, 1.0f, 1.0f };
@@ -59,10 +95,12 @@ namespace rtw
 
 				for (const auto& sphere : sceneView_)
 				{
-					if (sphere.hit(ray, result) && result.t < closestT)
+					// t of 0.0f indicates a miss (t must be greater than a tolerance)
+					float t = sphere.checkHit(ray);
+					if (t > 0.0f && t < closestT)
 					{
 						closestSphere = &sphere;
-						closestT = result.t;
+						closestT = t;
 					}
 				}
 
@@ -79,6 +117,13 @@ namespace rtw
 				}
 				else
 				{
+//#ifndef __CUDA_ARCH__
+//					Sphere::bounceCount+= i;
+//
+//					double error{ i - Sphere::mean };
+//					Sphere::accSqrError += error * error;
+//#endif
+
 					// ray failed to hit anything return the accumulated color
 					// Could make this a gradient
 					//Vec3 ambientColor{ 0.5f, 0.7f, 1.0f };
@@ -96,11 +141,19 @@ namespace rtw
 				}
 			}
 
+//#ifndef __CUDA_ARCH__
+//			Sphere::bounceCount += nBounces;
+//			Sphere::maxBounceCount++;
+//
+//			double error{ nBounces - Sphere::mean };
+//			Sphere::accSqrError += error * error;
+//#endif
+
 			// Max number of bounces reached return no contribution
 			return Vec3{0.0f, 0.0f, 0.0f};
 		}
 
-		__host__ __device__ void initializeScene(Camera camera, curandState* randState)
+		__host__ __device__ void initializeScene(curandState* randState)//(Camera camera, curandState* randState)
 		{
 			auto sphere = sceneView_.begin();
 
@@ -124,7 +177,7 @@ namespace rtw
 					float radius = 0.2f;
 					Vec3 center{ x + 0.9f * randomFloat(randState), radius, z + 0.9f * randomFloat(randState) };
 					
-					if ((center - Vec3{ 4.0f, 0.2, 0 }).length() > 0.9f)
+					if ((center - Vec3{ 4.0f, 0.2f, 0.0f }).length() > 0.9f)
 					{
 						float randomMat = randomFloat(randState);
 
@@ -148,7 +201,7 @@ namespace rtw
 					}
 					else
 					{
-						// hide rather deal with dynamic memory for now
+						// hide rather than deal with dynamic memory for now
 						*sphere = Sphere{};
 						sphere->visible = false;
 					}
@@ -156,8 +209,6 @@ namespace rtw
 					sphere++;
 				}
 			}
-
-			//sphere++;
 
 			//// Chapter 13 scene
 			//*sphere = Sphere{ 0.0f, -100.5f, -1.0f, 100.0f, Material{ Vec3{ 0.8f, 0.8f, 0.4f }, BlendMode::diffuse, 1.0f } };
@@ -184,6 +235,8 @@ namespace rtw
 			//// Ruby
 			//*sphere = Sphere{ 1.0f, -.35f, 0.0f, 0.15f, Material{ Vec3{ 1.0f, 0.5f, 0.5f }, BlendMode::translucent, 0.0f, 1.8f } };
 
+
+			sortVisible();
 		}
 
 		__host__ __device__ Vec3 randomVec(curandState* randstate)

@@ -41,6 +41,14 @@ namespace rtw
 			return *this;
 		}
 
+		__host__ __device__ Vec3& operator-=(const Vec3& other)
+		{
+			values[0] -= other.values[0];
+			values[1] -= other.values[1];
+			values[2] -= other.values[2];
+			return *this;
+		}
+
 		__host__ __device__ Vec3& operator*=(float t)
 		{
 			values[0] *= t;
@@ -83,9 +91,28 @@ namespace rtw
 			return *this;
 		}
 
+
+		__host__ __device__ friend Vec3 operator-(const Vec3& a, const Vec3& b);
+
 		__host__ __device__ friend float dot(const Vec3& a, const Vec3& b);
 
 		__host__ __device__ friend Vec3 cross(const Vec3& a, const Vec3& b);
+
+		__host__ __device__ friend Vec3 at(const Vec3& a, const Vec3& b, float t);
+
+		/*__host__ __device__ friend float dot(Vec3 a, Vec3 b);
+
+		__host__ __device__ friend Vec3 cross(Vec3 a, Vec3 b);*/
+
+		/*__host__ __device__ float dot(const Vec3& b)
+		{
+			return (values[0] * b.values[0] + values[1] * b.values[1] + values[2] * b.values[2]);
+		}*/
+
+		__host__ __device__ float dot(Vec3 b)
+		{
+			return (values[0] * b.values[0] + values[1] * b.values[1] + values[2] * b.values[2]);
+		}
 
 	private:
 
@@ -100,9 +127,10 @@ namespace rtw
 
 	__host__ __device__ inline Vec3 operator-(const Vec3& a, const Vec3& b)
 	{
-		Vec3 result{ -b };
-		result += a;
-		return result;
+		Vec3 result{ a };
+		return result -= b;
+
+		//return Vec3{ a[0] - b[0], a[1] - b[1], a[2] - b[2] };
 	}
 
 	__host__ __device__ inline Vec3 operator*(const Vec3& v, float t)
@@ -136,9 +164,61 @@ namespace rtw
 		);
 	}
 
+	__host__ __device__ inline Vec3 at(const Vec3& a, const Vec3& b, float t)
+	{
+		return Vec3{ a[0] + b[0] * t, a[1] + b[1] * t, a[2] + b[2] * t };
+	}
+
+
 	inline std::ostream& operator<<(std::ostream& ostr, const Vec3& v)
 	{
 		ostr << "(" << v.x() << ", " << v.y() << ", " << v.z() << ")";
 		return ostr;
 	}
+
+
+	// By value
+
+	/*__host__ __device__ inline Vec3 operator+(const Vec3& a, const Vec3& b)
+	{
+		Vec3 result{ a };
+		return result += b;
+	}
+
+	__host__ __device__ inline Vec3 operator-(const Vec3& a, const Vec3& b)
+	{
+		Vec3 result{ a };
+		return result -= b;
+	}
+
+	__host__ __device__ inline Vec3 operator*(const Vec3& v, float t)
+	{
+		Vec3 result{ v };
+		return result *= t;
+	}
+
+	__host__ __device__ inline Vec3 operator*(float t, const Vec3& v)
+	{
+		return v * t;
+	}
+
+	__host__ __device__ inline Vec3 normalized(const Vec3& v)
+	{
+		Vec3 vec{ v };
+		return vec *= (1.0f / v.length());
+	}
+
+	__host__ __device__ inline float dot(Vec3 a, Vec3 b)
+	{
+		return (a.values[0] * b.values[0] + a.values[1] * b.values[1] + a.values[2] * b.values[2]);
+	}
+
+	__host__ __device__ inline Vec3 cross(Vec3 a, Vec3 b)
+	{
+		return Vec3(
+			a.values[1] * b.values[2] - a.values[2] * b.values[1],
+			a.values[2] * b.values[0] - a.values[0] * b.values[2],
+			a.values[0] * b.values[1] - a.values[1] * b.values[0]
+		);
+	}*/
 }
