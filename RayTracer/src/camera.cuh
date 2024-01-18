@@ -28,8 +28,8 @@ namespace rtw
 		__host__ __device__ Vec3 cameraPosition() const { return cameraPos_; }
 		__host__ __device__ Vec3 viewOrigin() const { return pixelOrigin_; }
 
-		__host__ __device__ float deltaU() const { return deltaU_; }
-		__host__ __device__ float deltaV() const { return deltaV_; }
+		/*__host__ __device__ float deltaU() const { return deltaU_; }
+		__host__ __device__ float deltaV() const { return deltaV_; }*/
 
 		__host__ void setFocus(float fov, float focalLength, float fNumber = 1000000.0f)
 		{
@@ -92,11 +92,14 @@ namespace rtw
 			viewHeight_ = 2.0f * focalLength_ * std::tan(fov_ * static_cast<float>(std::_Pi) / 360.0f);
 			viewWidth_ = viewHeight_ * aspectRatio_;
 
-			deltaU_ = viewWidth_ / screenWidth_;
+			/*deltaU_ = viewWidth_ / screenWidth_;
 			deltaV_ = viewHeight_ / screenHeight_;
 
 			viewBasisU_ = deltaU_ * cameraRight_;
-			viewBasisV_ = deltaV_ * cameraUp_;
+			viewBasisV_ = deltaV_ * cameraUp_;*/
+
+			viewBasisU_ = viewWidth_ / screenWidth_ * cameraRight_;
+			viewBasisV_ = viewHeight_ / screenHeight_ * cameraUp_;
 
 			viewCenter_ = cameraPos_ + cameraForward_ * focalLength_;
 			viewOrigin_ = viewCenter_ + 0.5f * ((cameraUp_ * viewHeight_) - (cameraRight_ * viewWidth_));
@@ -108,81 +111,74 @@ namespace rtw
 			return Vec3{ x * viewWidth_ + viewOrigin_.x(), y * -viewHeight_ + viewOrigin_.y(), viewOrigin_.z() };
 		}
 
-		// Convenient if iterating over a buffer with two loops
-		__host__ __device__ Ray getRayFromScreenPos(int x, int y) const
-		{
-			Vec3 pixelPos{ pixelOrigin_ + Vec3(x * deltaU_, -y * deltaV_, 0.0f) };
-			Ray ray(cameraPos_, pixelPos - cameraPos_);
-			return ray;
-		}
+		//// Convenient if iterating over a buffer with two loops
+		//__host__ __device__ Ray getRayFromScreenPos(int x, int y) const
+		//{
+		//	Vec3 pixelPos{ pixelOrigin_ + Vec3(x * deltaU_, -y * deltaV_, 0.0f) };
+		//	Ray ray(cameraPos_, pixelPos - cameraPos_);
+		//	return ray;
+		//}
 
 		// Best for iterating over a buffer with a single loop (or striding on gpu)
-		__host__ __device__ Ray getRayFromPixelIndex(int index) const
-		{
-			// Direct method to get screen coordinates from pixel index 
-			//int x = index % screenWidth_;
-			//int y = index / screenWidth_;
+		//__host__ __device__ Ray getRayFromPixelIndex(int index) const
+		//{
+		//	// Direct method to get screen coordinates from pixel index 
+		//	//int x = index % screenWidth_;
+		//	//int y = index / screenWidth_;
 
-			//// pixel position in normalized screen coordinates
-			//float px = x / screenWidth_;
-			//float py = y / screenHeight_;
+		//	//// pixel position in normalized screen coordinates
+		//	//float px = x / screenWidth_;
+		//	//float py = y / screenHeight_;
 
-			//// Convert to world space coordinates
-			//// Take care that world y decreases as screen y increases
-			//Vec3 pixelPos{ px * viewWidth_, -py * viewHeight_, 0.0f };
-			//pixelPos += pixelOrigin_;
+		//	//// Convert to world space coordinates
+		//	//// Take care that world y decreases as screen y increases
+		//	//Vec3 pixelPos{ px * viewWidth_, -py * viewHeight_, 0.0f };
+		//	//pixelPos += pixelOrigin_;
 
-			// pixel offsets in world units (avoiding extra divisions)
-			// float px = static_cast<float>(index % screenWidth_) * deltaU_;
-			// float py = static_cast<float>(index / screenWidth_) * deltaV_;
+		//	// pixel offsets in world units (avoiding extra divisions)
+		//	// float px = static_cast<float>(index % screenWidth_) * deltaU_;
+		//	// float py = static_cast<float>(index / screenWidth_) * deltaV_;
 
-			// may want to try potential optimizations to avoid division/modulo
-			// and/or experiment with math intrinsics
-			// cache rw = 1/width, rh = 1/height before rendering a frame ( and sx = viewWidth/width, sy = viewHeight/height )
-			// get back the screen space coords from the pixel index
-			// y = "floor"( index * rw ), x = index - y * w
-			// index will not be negative so floor and static_cast<int>() should both work
-			// with casting allegedly faster for cpu but no idea for gpu with intrinsics
-			// scale from screen space to world space with
-			// px = x * sx, py = y * sy
+		//	// may want to try potential optimizations to avoid division/modulo
+		//	// and/or experiment with math intrinsics
+		//	// cache rw = 1/width, rh = 1/height before rendering a frame ( and sx = viewWidth/width, sy = viewHeight/height )
+		//	// get back the screen space coords from the pixel index
+		//	// y = "floor"( index * rw ), x = index - y * w
+		//	// index will not be negative so floor and static_cast<int>() should both work
+		//	// with casting allegedly faster for cpu but no idea for gpu with intrinsics
+		//	// scale from screen space to world space with
+		//	// px = x * sx, py = y * sy
 
-			// pixel offsets in world units (avoiding division entirely)
-			int y = static_cast<int>(index * recipWidth_);
-			float px = (index - y * screenWidth_) * deltaU_;
-			float py = y * deltaV_;
+		//	// pixel offsets in world units (avoiding division entirely)
+		//	int y = static_cast<int>(index * recipWidth_);
+		//	float px = (index - y * screenWidth_) * deltaU_;
+		//	float py = y * deltaV_;
 
-			// Get the world space postition of the pixel
-			Vec3 pixelPos{ px, -py, 0.0f };
-			pixelPos += pixelOrigin_;
-			
+		//	// Get the world space postition of the pixel
+		//	Vec3 pixelPos{ px, -py, 0.0f };
+		//	pixelPos += pixelOrigin_;
+		//	
 
-			Ray ray(cameraPos_, pixelPos - cameraPos_);
-			return ray;
-		}
+		//	Ray ray(cameraPos_, pixelPos - cameraPos_);
+		//	return ray;
+		//}
 
 		__host__ __device__ Vec3 getWorldPosFromPixelIndex(int index) const
-		{
-			// pixel offsets in world units (avoiding division entirely)
-			/*float y = static_cast<int>(index * recipWidth_);
-			float px = (index - y * screenWidth_) * deltaU_;
-			float py = y * deltaV_;*/
-
-			// Get the world space postition of the pixel
-			//return Vec3{ pixelOrigin_.x() + px, pixelOrigin_.y() -py, pixelOrigin_.z() };
-
-
-			Point2D point = getPixelCoordFromIndex(index);
-			return pixelOrigin_ + (point.x * viewBasisU_) - (point.y * viewBasisV_);
-		}
-
-
-		__host__ __device__ Point2D getPixelCoordFromIndex(int index) const
 		{
 			// Truncate the result of "dividing" index by number of pixels in a screen row
 			float y{ static_cast<float>(static_cast<int>(index * recipWidth_)) };
 			float x{ index - y * screenWidth_ };
-			return Point2D{ x, y };
+			return pixelOrigin_ + (x * viewBasisU_) - (y * viewBasisV_);
 		}
+
+
+		//__host__ __device__ Point2D getPixelCoordFromIndex(int index) const
+		//{
+		//	// Truncate the result of "dividing" index by number of pixels in a screen row
+		//	float y{ static_cast<float>(static_cast<int>(index * recipWidth_)) };
+		//	float x{ index - y * screenWidth_ };
+		//	return Point2D{ x, y };
+		//}
 
 		// Add a screen space shift to a world position (for multisampling)
 		__host__ __device__ Vec3 shiftWorldPos(Vec3 worldPos, float shiftX, float shiftY) const
@@ -192,19 +188,17 @@ namespace rtw
 			return worldPos + (shiftX * viewBasisU_) + (shiftY * viewBasisV_);
 		}
 
-		__host__ __device__ Vec3 getSampleOrigin(curandState* randState) const
+		__host__ __device__ Vec3 getSampleOrigin(uint32_t& pcgState) const
 		{
-			/*float shiftX = randomFloat(randState) - 0.5f;
-			float shiftY = randomFloat(randState) - 0.5f;*/
-
-			Vec3 shift{};
+			float shiftX{};
+			float shiftY{};
 
 			for (;;)
 			{
-				shift[0] = 2.0f * randomFloat(randState) - 1.0f;
-				shift[1] = 2.0f * randomFloat(randState) - 1.0f;
+				shiftX = 2.0f * randomFloat(pcgState) - 1.0f;
+				shiftY = 2.0f * randomFloat(pcgState) - 1.0f;
 
-				if (shift.length_squared() <= 1.0f)
+				if (shiftX * shiftX + shiftY * shiftY <= 1.0f)
 				{
 					// dont normalize want inside unit disk not on edge
 					//shift.normalize();
@@ -212,10 +206,20 @@ namespace rtw
 				}
 			}			
 
-			float shiftX = shift[0];
-			float shiftY = shift[1];
-
 			return cameraPos_ + (shiftX * lensBasisU_) + (shiftY * lensBasisV_);
+		}
+
+		__host__ __device__ Ray generateRay(Vec3 worldPos, uint32_t& pcgState) const
+		{
+			Vec3 origin = getSampleOrigin(pcgState);
+
+			Vec3 samplePos = shiftWorldPos(worldPos, randomFloat(pcgState) - 0.5f, randomFloat(pcgState) - 0.5f);
+
+			samplePos -= origin;
+			samplePos.normalize();
+
+
+			return { origin, samplePos };
 		}
 
 
@@ -253,12 +257,15 @@ namespace rtw
 
 		// Distance between pixels in viewport units (ideally should be equal)
 		// Also acts as a scale factor between screen space and view space (and world space if viewport dimensions are world space)
-		float deltaU_{ viewWidth_ / screenWidth_ };
-		float deltaV_{ viewHeight_ / screenHeight_ };
+		//float deltaU_{ viewWidth_ / screenWidth_ };
+		//float deltaV_{ viewHeight_ / screenHeight_ };
 
-		// pre multiply camera basis vectors by pixel deltas
-		Vec3 viewBasisU_{ deltaU_ * cameraRight_ };
-		Vec3 viewBasisV_{ deltaV_ * cameraUp_ };
+		//// pre multiply camera basis vectors by pixel deltas
+		//Vec3 viewBasisU_{ deltaU_ * cameraRight_ };
+		//Vec3 viewBasisV_{ deltaV_ * cameraUp_ };
+
+		Vec3 viewBasisU_{ viewWidth_ / screenWidth_ * cameraRight_ };
+		Vec3 viewBasisV_{ viewHeight_ / screenHeight_ * cameraUp_ };
 
 		Vec3 viewCenter_{ cameraPos_ + cameraForward_ * focalLength_ }; // Center of the screen in worldspace
 		Vec3 viewOrigin_{ viewCenter_ + 0.5f * ((cameraUp_ * viewHeight_) - (cameraRight_ * viewWidth_)) }; // Topleft of screen in worldspace

@@ -26,68 +26,36 @@ namespace rtw
 		}
 	}
 
-	//__global__ void initializeSceneKernel(Scene* scene, Sphere* spheres, int numSpheres)
-	//{
-	//	// Only execute once
-	//	if (threadIdx.x != 0 || blockIdx.x != 0 || threadIdx.y != 0 || blockIdx.y != 0)
-	//	{
-	//		return;
-	//	}
-
-	//	*scene = { spheres, spheres + numSpheres };
-
-	//	curandState randState;
-	//	curand_init(1234, 0, 0, &randState);
-
-	//	scene->initializeScene(&randState);
-	//}
-
-	__global__ void initRandomKernel(curandState* state, int stateSize, int seed)
-	{
-		int thread = threadIdx.x + blockIdx.x * blockDim.x;
-		if (thread >= stateSize)
-		{
-			return;
-		}
-
-		// set same seed difference sequence for each thread
-		curand_init(seed, thread, 0, &state[thread]);
-	}
-
-	__global__ void renderRayKernel(float* buffer, Camera camera, Scene scene, curandState* randStates)
+	__global__ void renderRayKernel(float* buffer, Camera camera, Scene scene)
 	{
 		int strideX = blockDim.x * gridDim.x;
 		int thread = threadIdx.x + blockIdx.x * blockDim.x;
-		curandState* randState = &randStates[thread];
 
 		for (int pixel = thread; pixel < camera.totalPixels(); pixel += strideX)
 		{
+			uint32_t pcgState = pixel;
+
 			Vec3 worldPos = camera.getWorldPosFromPixelIndex(pixel);
 
 			Vec3 color{};
 
-			for (int i = 0; i < camera.nSamples(); ++i)
+			const int nSamples = camera.nSamples();
+
+			for (int i = 0; i < nSamples; ++i)
 			{
-				// sample defocus disk
-				Vec3 rayOrigin = camera.getSampleOrigin(randState);
+				// Create a ray from a random point on DOF disk to random point in the pixel
+				Ray ray = camera.generateRay(worldPos, pcgState);
 
-				// Sample a random location inside the square halfway between the pixel position
-				// and the positions of neighboring pixels
-				Vec3 samplePos = camera.shiftWorldPos(worldPos, randomFloat(randState) - 0.5f, randomFloat(randState) - 0.5f);
-
-				Ray ray{ rayOrigin, (samplePos - rayOrigin).normalize() };
-
-				color += scene.getColor(ray, camera.nBounces(), randState);
+				//color += scene.getColor(ray, camera.nBounces(), pcgState);
+				
+				color += ray.direction();
 			}
 
-			color *= 1.0f / camera.nSamples();
+			//color *= 1.0f / camera.nSamples();
 
-
-			/*Ray ray = camera.getRayFromPixelIndex(pixel);
-
-			Vec3 color{ scene.getColor(ray, &randStates[thread]) };*/
-
-			// Write color to buffer
+			// Seems to use 14 registers on its own vectorization can sometimes help
+			// but might not when register bound
+			//// Write color to buffer
 			int index = 3 * pixel;
 			buffer[index] = color.x();
 			buffer[index + 1] = color.y();
@@ -101,7 +69,7 @@ namespace rtw
 		int index;
 	};
 
-	std::vector<float> rtw::renderGPU(const Camera& camera, int numSpheres)
+	std::vector<float> rtw::renderGPU(const Camera& camera, const Scene& scene)
 	{	
 		cudaDeviceProp prop;
 		CHECK(cudaGetDeviceProperties(&prop, 0));
@@ -114,70 +82,29 @@ namespace rtw
 
 		// want to pick multiples of 32 to maximize warp usage
 		const int threadsPerBlock{ 256 };
-		
 		const int blocks{ maxThreadsTotal / threadsPerBlock };
 
-		const int threadCount = threadsPerBlock * blocks;
-
-		// Old
-		// Want number of threads per block to be multiple of 32
-		// will have to experiment with optimal amount
-		// also will want to clamp the max num of blocks for high resolutions
-		/*constexpr int threadsPerBlock{ 1024 };
-		const int blocks{ camera.totalPixels() / threadsPerBlock + 1 };
-		int threadCount = threadsPerBlock * blocks;*/
 
 		// Allocate memory for the frame buffer
 		float* buffer{};
 		const size_t bufferSize{ static_cast<size_t>(camera.totalPixels() * camera.nChannels()) };
 		CHECK(cudaMallocManaged(&buffer, bufferSize * sizeof(float)));
 
-		//// Allocate memory and initialize scene on device
-		//Sphere* spheres{};
-		//CHECK(cudaMalloc(&spheres, numSpheres * sizeof(Sphere)));
-		//Scene* scene{};
-		//CHECK(cudaMallocManaged(&scene, sizeof(Scene)));
-		//
-		//initializeSceneKernel << <1, 1 >> > (scene, spheres, numSpheres);
-		//CHECK(cudaGetLastError());
-		//CHECK(cudaDeviceSynchronize());
 
-
-		// Create the scene on CPU
-		std::unique_ptr<Sphere[]> spheresHost{ new Sphere[numSpheres] };
-		std::unique_ptr<Collider[]> collidersHost{ new Collider[numSpheres] };
-		Scene sceneHost{ spheresHost.get(), collidersHost.get(), numSpheres };
-		sceneHost.initializeScene(nullptr);
-
-		numSpheres = sceneHost.sphereListVisibleCount();
-		
-		//// Allocate memory and initialize scene on device
-		//Sphere* spheres{};
-		//CHECK(cudaMalloc(&spheres, numSpheres * sizeof(Sphere)));
-		//CHECK(cudaMemcpy(spheres, spheresHost.get(), numSpheres * sizeof(Sphere), cudaMemcpyHostToDevice));
-		//CHECK(cudaDeviceSynchronize());
-		//Scene scene{ spheres, spheres + numSpheres, spheres + numSpheres };
-
-		// Allocate memory and initialize scene on device
+		// Copy spheres and colliders to device and wrap in a scene
 		Sphere* spheres{};
 		Collider* colliders{};
+		int numSpheres = scene.getSphereCount();
 		CHECK(cudaMalloc(&spheres, numSpheres * sizeof(Sphere)));
 		CHECK(cudaMalloc(&colliders, numSpheres * sizeof(Collider)));
-		CHECK(cudaMemcpy(spheres, sceneHost.spheresBegin(), numSpheres * sizeof(Sphere), cudaMemcpyHostToDevice));
-		CHECK(cudaMemcpy(colliders, sceneHost.collidersBegin(), numSpheres * sizeof(Collider), cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(spheres, scene.getSpheres(), numSpheres * sizeof(Sphere), cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(colliders, scene.getColliders(), numSpheres * sizeof(Collider), cudaMemcpyHostToDevice));
 		CHECK(cudaDeviceSynchronize());
-		Scene scene{ spheres, colliders, numSpheres };
+		Scene sceneDevice{ spheres, colliders, numSpheres };
 
-
-		// Allocate memory and initialize rand states for each thread
-		curandState* randStates{};
-		CHECK(cudaMalloc(&randStates, threadCount * sizeof(curandState)));
-		initRandomKernel << <blocks, threadsPerBlock >> > (randStates, threadCount, 1337);
-		CHECK(cudaGetLastError());
-		CHECK(cudaDeviceSynchronize());
 
 		// Render the frame
-		renderRayKernel << <blocks, threadsPerBlock >> > (buffer, camera, scene, randStates);
+		renderRayKernel<<<blocks, threadsPerBlock>>>(buffer, camera, sceneDevice);
 		CHECK(cudaGetLastError());
 		CHECK(cudaDeviceSynchronize());
 
@@ -185,9 +112,15 @@ namespace rtw
 		std::vector<float> data{};
 		data.assign(buffer, buffer + bufferSize);
 
+		// do this off kernel to remove some register pressure
+		for (auto & value : data)
+		{
+			value /= camera.nSamples();
+		}
+
 		// Release device memory
 		CHECK(cudaFree(spheres));
-		CHECK(cudaFree(randStates));
+		CHECK(cudaFree(colliders));
 		CHECK(cudaFree(buffer));
 
 		return data;

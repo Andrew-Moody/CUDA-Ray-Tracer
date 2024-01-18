@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <cmath>
-
 #include <device_launch_parameters.h>
 
 namespace rtw
@@ -87,7 +86,7 @@ namespace rtw
 
 		__host__ __device__ Vec3& normalize()
 		{
-			*this /= std::sqrt(length_squared());
+			*this *= (1.0f / std::sqrt(length_squared()));
 			return *this;
 		}
 

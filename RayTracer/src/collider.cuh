@@ -44,80 +44,96 @@ namespace rtw
 			return t;
 		}
 
+
+		__host__ __device__ float fastHit(Ray ray) const
+		{
+			// t1 might be a small +- number when checked for the refracting from sphere
+			// t2 might be a small +- number when checked for the diffuse/reflecting from sphere
+			// either will have to be greater than a tolerance to qualify as a hit
+
+			// Since we want the closest sphere, a final value for t greater or equal to a max distance
+			// will be considered a miss. The mac distance will have to be picked to limit precision issues
+			// for distance objects (10,000 meters for a first guess)
+			// MAXHALFB is the square of this max distance since it is the square length
+			// MAXB is 2 x MAXHALFB so that potentially large numbers (up to MAXHALFB) subtracted from MAXB
+			// still yield >= MAXHALFB
+
+			/*const float TOLERANCE{ 0.001f };
+			const float MAXHALFB{ 1.0e8f };
+			const float MAXB{ 2.0f * MAXHALFB };*/
+
+			// Reversed the order since we want negative b/2 eventually
+			Vec3 diff = center_ - ray.origin();
+			float minusHalfB = ray.direction().dot(diff);
+			float c = diff.length_squared() - radiusSquared_;
+			float discr = minusHalfB * minusHalfB - c;
+
+			// Early return actually seems to help when the the majority of
+			// cases will return such that all threads in a warp can return early
+			
+			//discr = discr >= 0.0f ? discr : 1.0e16f;
+
+			if (discr < 0.0f)
+			{
+				return 1.0e8f;
+			}
+
+			discr = std::sqrt(discr);
+
+			//float sqrtDiscr = std::sqrt(discr);
+
+			// Get the sqrt only if discr is positive else return MAX
+			//float sqrtDiscr = discr >= 0.0f ? std::sqrt(discr) : MAXB;
+
+			//float sqrtDiscr = std::sqrt(discr);
+			//sqrtDiscr = fminf(sqrtDiscr, MAXB); // returns MAXB if discr is NAN, but is it safe?
+			
+			// The two potential intersection distances
+			//float t1 = minusHalfB - sqrtDiscr; // t will also be negative if discr was < 0
+			//float t2 = minusHalfB + sqrtDiscr; // at minusHalfB = -MAXHALFB t2 >= MAXHALFB even if discr was < 0
+
+			// t1 needs to be positive to be in front of the ray but also needs be greater
+			// than a tolerance to prevent a refracting from sphere causing a false positive 
+			//float t = t1 > TOLERANCE ? t1 : minusHalfB + sqrtDiscr; // t = t2 if discr < 0 or t < 0.001f
+			
+			// t now equals either a valid t1, or t2 which may be +, -, or >= MAXHALFB if discr was < 0
+			// t2 is only valid during refraction and needs to be greater than a tolerance or a sphere being
+			// bounced from will cause a false positive
+			//t = t > TOLERANCE ? t : MAXB;
+
+			// If the final t >= MAXHALFB it will be considered a miss
+
+			//float t1 = minusHalfB - discr; // t will also be negative if discr was < 0
+			//float t2 = minusHalfB + sqrtDiscr; // at minusHalfB = -MAXHALFB t2 >= MAXHALFB even if discr was < 0
+
+			// t1 needs to be positive to be in front of the ray but also needs be greater
+			// than a tolerance to prevent a refracting from sphere causing a false positive 
+			//float t = t1 > TOLERANCE ? t1 : minusHalfB + discr; // t = t2 if discr < 0 or t < 0.001f
+
+			// t now equals either a valid t1, or t2 which may be +, -, or >= MAXHALFB if discr was < 0
+			// t2 is only valid during refraction and needs to be greater than a tolerance or a sphere being
+			// bounced from will cause a false positive
+			//t = t > TOLERANCE ? t : MAXB;
+
+			float t = minusHalfB - discr; // t will also be negative if discr was < 0
+			//float t2 = minusHalfB + sqrtDiscr;
+
+			if (t < 0.001f)
+			{
+				t = minusHalfB + discr;
+
+				if (t < 0.001f)
+				{
+					return 1.0e5f;
+				}
+			}
+
+			return t;
+		}
+
 	private:
 
 		Vec3 center_{};
 		float radiusSquared_{};
-	};
-
-
-	class SphereList
-	{
-	public:
-
-		__host__ __device__ SphereList() {}
-
-		__host__ __device__ SphereList(Sphere* spheres, Collider* colliders, int count)
-			: spheres_{ spheres }, colliders_{ colliders }, count_{ count }, visibleCount_{ count } {}
-
-		__host__ __device__ Sphere& sphereAt(int index) { return spheres_[index]; }
-		__host__ __device__ Collider& colliderAt(int index) { return colliders_[index]; }
-
-		__host__ __device__ const Sphere& sphereAt(int index) const { return spheres_[index]; }
-		__host__ __device__ const Collider& colliderAt(int index) const { return colliders_[index]; }
-
-		__host__ __device__ int count() const { return count_; }
-
-		__host__ __device__ int visibleCount() const { return visibleCount_; }
-
-		__host__ __device__ void sortVisible()
-		{
-			// Start at the end of the array
-			auto back = count_ - 1;
-
-			// skip to the first visible from the end keeping any
-			// non visible where they are at the end
-			while (back >= 0 && !spheres_[back].visible)
-			{
-				--back;
-			}
-
-			// Search the rest of the array for non visible spheres
-			// and swap with the last visible
-			for (auto front = back - 1; front >= 0; --front)
-			{
-				if (!spheres_[front].visible)
-				{
-					// Swap spheres and colliders
-
-					Sphere temp{ spheres_[back] };
-					spheres_[back] = spheres_[front];
-					spheres_[front] = temp;
-
-					Collider tempCollider{ colliders_[back] };
-					colliders_[back] = colliders_[front];
-					colliders_[front] = tempCollider;
-					--back;
-				}
-			}
-
-			visibleCount_ = back + 1;
-		}
-
-
-		__host__ __device__ void updateColliders()
-		{
-			for (int i = 0; i < count_; ++i)
-			{
-				colliders_[i] = Collider{ spheres_[i] };
-			}
-		}
-
-	private:
-
-		Sphere* spheres_{};
-		Collider* colliders_{};
-		int count_{};
-		int visibleCount_{};
 	};
 }

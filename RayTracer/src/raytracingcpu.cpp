@@ -6,6 +6,7 @@
 #include "ray.cuh"
 #include "camera.cuh"
 #include "hittable.cuh"
+#include "scenegenerator.h"
 #include "scene.cuh"
 #include "sphere.cuh"
 #include "random.cuh"
@@ -13,17 +14,8 @@
 namespace rtw
 {
 
-	std::vector<float> rtw::renderCPU(const Camera& camera, int numSpheres)
+	std::vector<float> rtw::renderCPU(const Camera& camera, const Scene& scene)
 	{
-		// Create a scene for cpu
-		/*std::unique_ptr<Sphere[]> spheres{ new Sphere[numSpheres] };
-		Scene scene{ spheres.get(), spheres.get() + numSpheres };*/
-
-		std::unique_ptr<Sphere[]> spheres{ new Sphere[numSpheres] };
-		std::unique_ptr<Collider[]> colliders{ new Collider[numSpheres] };
-		Scene scene{ spheres.get(), colliders.get(), numSpheres };
-		scene.initializeScene(nullptr);
-
 		// frame buffer
 		const int size{ camera.totalPixels() * camera.nChannels() };
 		std::vector<float> imageData(size);
@@ -36,18 +28,13 @@ namespace rtw
 
 			Vec3 color{};
 
+			uint32_t pcgState = pixel;
+
 			for (int i = 0; i < camera.nSamples(); ++i)
 			{
-				// sample defocus disk
-				Vec3 rayOrigin = camera.getSampleOrigin(nullptr);
+				Ray ray = camera.generateRay(worldPos, pcgState);
 
-				// Sample a random location inside the square halfway between the pixel position
-				// and the positions of neighboring pixels
-				Vec3 samplePos = camera.shiftWorldPos(worldPos, randomFloat(nullptr) - 0.5f, randomFloat(nullptr) - 0.5f);
-
-				Ray ray{ rayOrigin, (samplePos - rayOrigin).normalize() };
-
-				color += scene.getColor(ray, camera.nBounces(), nullptr);
+				color += scene.getColor(ray, camera.nBounces(), pcgState);
 			}
 			
 			color *= 1.0f / camera.nSamples();

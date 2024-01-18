@@ -45,5 +45,6 @@
     <ClInclude Include="src\extra.cuh" />
     <ClInclude Include="src\random.cuh" />
     <ClInclude Include="src\collider.cuh" />
+    <ClInclude Include="src\scenegenerator.h" />
   </ItemGroup>
 </Project>

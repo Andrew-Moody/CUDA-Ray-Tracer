@@ -5,6 +5,7 @@
 namespace rtw
 {
 	class Camera;
+	class Scene;
 
-	std::vector<float> renderGPU(const Camera& camera, int numSpheres);
+	std::vector<float> renderGPU(const Camera& camera, const Scene& scene);
 }
