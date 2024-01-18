@@ -135,6 +135,13 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <CudaCompile>
+      <FastMath>false</FastMath>
+      <CodeGeneration>compute_61,sm_61</CodeGeneration>
+      <GenerateLineInfo>true</GenerateLineInfo>
+      <PtxAsOptionV>true</PtxAsOptionV>
+      <InterleaveSourceInPTX>true</InterleaveSourceInPTX>
+    </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\image.cpp" />
@@ -146,6 +153,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\camera.cuh" />
+    <ClInclude Include="src\collider.cuh" />
     <ClInclude Include="src\extra.cuh" />
     <ClInclude Include="src\hittable.cuh" />
     <ClInclude Include="src\image.h" />

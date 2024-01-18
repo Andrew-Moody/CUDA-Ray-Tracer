@@ -26,21 +26,21 @@ namespace rtw
 		}
 	}
 
-	__global__ void initializeSceneKernel(Scene* scene, Sphere* spheres, int numSpheres)
-	{
-		// Only execute once
-		if (threadIdx.x != 0 || blockIdx.x != 0 || threadIdx.y != 0 || blockIdx.y != 0)
-		{
-			return;
-		}
+	//__global__ void initializeSceneKernel(Scene* scene, Sphere* spheres, int numSpheres)
+	//{
+	//	// Only execute once
+	//	if (threadIdx.x != 0 || blockIdx.x != 0 || threadIdx.y != 0 || blockIdx.y != 0)
+	//	{
+	//		return;
+	//	}
 
-		*scene = { spheres, spheres + numSpheres };
+	//	*scene = { spheres, spheres + numSpheres };
 
-		curandState randState;
-		curand_init(1234, 0, 0, &randState);
+	//	curandState randState;
+	//	curand_init(1234, 0, 0, &randState);
 
-		scene->initializeScene(&randState);
-	}
+	//	scene->initializeScene(&randState);
+	//}
 
 	__global__ void initRandomKernel(curandState* state, int stateSize, int seed)
 	{
@@ -95,6 +95,12 @@ namespace rtw
 		}
 	}
 
+	struct Transform
+	{
+		float x, y, z, r;
+		int index;
+	};
+
 	std::vector<float> rtw::renderGPU(const Camera& camera, int numSpheres)
 	{	
 		cudaDeviceProp prop;
@@ -103,9 +109,8 @@ namespace rtw
 		// total number of threads that can theoretically be resident
 		// 10 mp * 2048 threads per mp
 		const int maxThreadsTotal = 10 * 2048;
-		const int maxThreadsPerBlock = 1024;
-		const int maxBlocksTotal = 10 * 32;
-
+		//const int maxThreadsPerBlock = 1024;
+		//const int maxBlocksTotal = 10 * 32;
 
 		// want to pick multiples of 32 to maximize warp usage
 		const int threadsPerBlock{ 256 };
@@ -127,16 +132,43 @@ namespace rtw
 		const size_t bufferSize{ static_cast<size_t>(camera.totalPixels() * camera.nChannels()) };
 		CHECK(cudaMallocManaged(&buffer, bufferSize * sizeof(float)));
 
+		//// Allocate memory and initialize scene on device
+		//Sphere* spheres{};
+		//CHECK(cudaMalloc(&spheres, numSpheres * sizeof(Sphere)));
+		//Scene* scene{};
+		//CHECK(cudaMallocManaged(&scene, sizeof(Scene)));
+		//
+		//initializeSceneKernel << <1, 1 >> > (scene, spheres, numSpheres);
+		//CHECK(cudaGetLastError());
+		//CHECK(cudaDeviceSynchronize());
+
+
+		// Create the scene on CPU
+		std::unique_ptr<Sphere[]> spheresHost{ new Sphere[numSpheres] };
+		std::unique_ptr<Collider[]> collidersHost{ new Collider[numSpheres] };
+		Scene sceneHost{ spheresHost.get(), collidersHost.get(), numSpheres };
+		sceneHost.initializeScene(nullptr);
+
+		numSpheres = sceneHost.sphereListVisibleCount();
+		
+		//// Allocate memory and initialize scene on device
+		//Sphere* spheres{};
+		//CHECK(cudaMalloc(&spheres, numSpheres * sizeof(Sphere)));
+		//CHECK(cudaMemcpy(spheres, spheresHost.get(), numSpheres * sizeof(Sphere), cudaMemcpyHostToDevice));
+		//CHECK(cudaDeviceSynchronize());
+		//Scene scene{ spheres, spheres + numSpheres, spheres + numSpheres };
+
 		// Allocate memory and initialize scene on device
 		Sphere* spheres{};
+		Collider* colliders{};
 		CHECK(cudaMalloc(&spheres, numSpheres * sizeof(Sphere)));
-		Scene* scene{};
-		CHECK(cudaMallocManaged(&scene, sizeof(Scene)));
-		
-		initializeSceneKernel << <1, 1 >> > (scene, spheres, numSpheres);
-		CHECK(cudaGetLastError());
+		CHECK(cudaMalloc(&colliders, numSpheres * sizeof(Collider)));
+		CHECK(cudaMemcpy(spheres, sceneHost.spheresBegin(), numSpheres * sizeof(Sphere), cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(colliders, sceneHost.collidersBegin(), numSpheres * sizeof(Collider), cudaMemcpyHostToDevice));
 		CHECK(cudaDeviceSynchronize());
-		
+		Scene scene{ spheres, colliders, numSpheres };
+
+
 		// Allocate memory and initialize rand states for each thread
 		curandState* randStates{};
 		CHECK(cudaMalloc(&randStates, threadCount * sizeof(curandState)));
@@ -145,7 +177,7 @@ namespace rtw
 		CHECK(cudaDeviceSynchronize());
 
 		// Render the frame
-		renderRayKernel << <blocks, threadsPerBlock >> > (buffer, camera, *scene, randStates);
+		renderRayKernel << <blocks, threadsPerBlock >> > (buffer, camera, scene, randStates);
 		CHECK(cudaGetLastError());
 		CHECK(cudaDeviceSynchronize());
 

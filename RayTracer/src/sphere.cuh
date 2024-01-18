@@ -44,6 +44,11 @@ namespace rtw
 		__host__ __device__ Sphere(const Vec3& center, float radius, Material material)
 			: center_{ center }, radius_{ radius }, material_{material} {}
 
+		__host__ __device__ Vec3 center() const { return center_; }
+		__host__ __device__ float radius() const { return radius_; }
+		__host__ __device__ float radiusSquared() const { return radius_ * radius_; }
+
+
 		__host__ __device__ float checkHit(Ray ray) const
 		{
 			/*if (!visible)
@@ -77,21 +82,26 @@ namespace rtw
 //				return 0.0f;
 //			}
 
-			float c = diff.length_squared() - radiusSquared_;
+			//float c = diff.length_squared() - radiusSquared_;
+
+			float c = diff.length_squared() - radius_ * radius_;
 
 			float discr = minusHalfB * minusHalfB - c;
+
 
 			if (discr < 0.0f)
 			{
 				return 0.0f;
 			}
 
-			float sqrtDiscr = std::sqrt(discr);
+			//float sqrtDiscr = std::sqrt(discr);
+
+			float sqrtDiscr = sqrtf(discr);
 
 			float t = (minusHalfB - sqrtDiscr);
 
 			// If t is negative it most likely means the sphere is behind the ray origin
-			// if t is zero it is detecting the point of bounce or refraction
+			// if t is close to zero it is detecting the point of bounce or refraction
 			if (t < 0.001f)
 			{
 				t = (minusHalfB + sqrtDiscr);
@@ -105,6 +115,73 @@ namespace rtw
 			return t;
 		}
 
+		//__host__ __device__ float fastHit(Ray ray) const
+		//{
+		//	// t1 might be a small +- number when checked for the refracting from sphere
+		//	// t2 might be a small +- number when checked for the diffuse/reflecting from sphere
+		//	// either will have to be greater than a tolerance to qualify as a hit
+
+		//	// Since we want the closest sphere, a final value for t greater or equal to a max distance
+		//	// will be considered a miss. The mac distance will have to be picked to limit precision issues
+		//	// for distance objects (10,000 meters for a first guess)
+		//	// MAXHALFB is the square of this max distance since it is the square length
+		//	// MAXB is 2 x MAXHALFB so that potentially large numbers (up to MAXHALFB) subtracted from MAXB
+		//	// still yield >= MAXHALFB
+
+		//	const float TOLERANCE{ 0.001f };
+		//	const float MAXHALFB{ 1.0e8f };
+		//	const float MAXB{ 2.0f * MAXHALFB };
+
+		//	// Reversed the order since we want negative b/2 eventually
+		//	Vec3 diff = center_ - ray.origin();
+		//	float minusHalfB = ray.direction().dot(diff);
+		//	float c = diff.length_squared() - radiusSquared_;
+		//	float discr = minusHalfB * minusHalfB - c;
+
+		//	discr = discr >= 0.0f ? discr : 1.0e16f;
+
+		//	discr = std::sqrt(discr);
+
+		//	//float sqrtDiscr = std::sqrt(discr);
+
+		//	// Get the sqrt only if discr is positive else return MAX
+		//	//float sqrtDiscr = discr >= 0.0f ? std::sqrt(discr) : MAXB;
+
+		//	//float sqrtDiscr = std::sqrt(discr);
+		//	//sqrtDiscr = fminf(sqrtDiscr, MAXB); // returns MAXB if discr is NAN, but is it safe?
+		//	
+		//	// The two potential intersection distances
+		//	//float t1 = minusHalfB - sqrtDiscr; // t will also be negative if discr was < 0
+		//	//float t2 = minusHalfB + sqrtDiscr; // at minusHalfB = -MAXHALFB t2 >= MAXHALFB even if discr was < 0
+
+		//	// t1 needs to be positive to be in front of the ray but also needs be greater
+		//	// than a tolerance to prevent a refracting from sphere causing a false positive 
+		//	//float t = t1 > TOLERANCE ? t1 : minusHalfB + sqrtDiscr; // t = t2 if discr < 0 or t < 0.001f
+		//	
+		//	// t now equals either a valid t1, or t2 which may be +, -, or >= MAXHALFB if discr was < 0
+		//	// t2 is only valid during refraction and needs to be greater than a tolerance or a sphere being
+		//	// bounced from will cause a false positive
+		//	//t = t > TOLERANCE ? t : MAXB;
+
+		//	// If the final t >= MAXHALFB it will be considered a miss
+
+		//	float t1 = minusHalfB - discr; // t will also be negative if discr was < 0
+		//	//float t2 = minusHalfB + sqrtDiscr; // at minusHalfB = -MAXHALFB t2 >= MAXHALFB even if discr was < 0
+
+		//	// t1 needs to be positive to be in front of the ray but also needs be greater
+		//	// than a tolerance to prevent a refracting from sphere causing a false positive 
+		//	float t = t1 > TOLERANCE ? t1 : minusHalfB + discr; // t = t2 if discr < 0 or t < 0.001f
+
+		//	// t now equals either a valid t1, or t2 which may be +, -, or >= MAXHALFB if discr was < 0
+		//	// t2 is only valid during refraction and needs to be greater than a tolerance or a sphere being
+		//	// bounced from will cause a false positive
+		//	t = t > TOLERANCE ? t : MAXB;
+
+
+		//	return t;
+		//}
+
+
 
 		__host__ __device__ Vec3 getColor(Ray ray, HitResult hitResult, curandState* randState) const
 		{
@@ -114,8 +191,7 @@ namespace rtw
 
 		__host__ __device__ bool cantRefract(float cosTheta, float refractRatio, float threshold) const
 		{
-			//float sinTheta = std::sqrt(1.0f - cosTheta * cosTheta);
-			if (refractRatio * std::sqrt(1.0f - cosTheta * cosTheta) > 1.0f)
+			if (refractRatio * sqrtf(1.0f - cosTheta * cosTheta) > 1.0f)
 			{
 				return true;
 			}
@@ -123,7 +199,9 @@ namespace rtw
 			//Schlick approximation
 			float r0 = (refractRatio - 1.0f) / (refractRatio + 1.0f);
 			r0 *= r0;
-			r0 = r0 + ((1.0f - r0) * static_cast<float>(pow((1.0f - cosTheta), 5)));
+			//Changing pow to powf or 5 to 5.0f reduces registers/thread from 56 to 46
+			//r0 = r0 + ((1.0f - r0) * static_cast<float>(pow((1.0f - cosTheta), 5)));
+			r0 = r0 + ((1.0f - r0) * powf((1.0f - cosTheta), 5.0f));
 
 			return r0 > threshold;
 
@@ -176,7 +254,9 @@ namespace rtw
 
 			if (material_.mode == BlendMode::translucent)
 			{
+				// Normalizing ray direction here should be extraneous (Somehow increases register count by 4?)
 				Vec3 bounceDir = refract(normalized(ray.direction()), normal, 1.0f / material_.refractIndex, randState);
+				//Vec3 bounceDir = refract(Vec3(ray.direction()), normal, 1.0f / material_.refractIndex, randState);
 
 				return BounceResult{ Ray{ point, bounceDir }, material_.albedo };
 			}
@@ -246,9 +326,17 @@ namespace rtw
 
 		Vec3 center_{};
 		float radius_{};
-		float radiusSquared_{radius_ * radius_};
+		//float radiusSquared_{radius_ * radius_};
 		Material material_{};
 	};
 
-	
+	/*class SphereCollider
+	{
+	public:
+
+		Vec3 center_{};
+		float radius_{};
+
+
+	};*/
 }

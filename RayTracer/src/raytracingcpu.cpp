@@ -16,8 +16,12 @@ namespace rtw
 	std::vector<float> rtw::renderCPU(const Camera& camera, int numSpheres)
 	{
 		// Create a scene for cpu
+		/*std::unique_ptr<Sphere[]> spheres{ new Sphere[numSpheres] };
+		Scene scene{ spheres.get(), spheres.get() + numSpheres };*/
+
 		std::unique_ptr<Sphere[]> spheres{ new Sphere[numSpheres] };
-		Scene scene{ spheres.get(), spheres.get() + numSpheres };
+		std::unique_ptr<Collider[]> colliders{ new Collider[numSpheres] };
+		Scene scene{ spheres.get(), colliders.get(), numSpheres };
 		scene.initializeScene(nullptr);
 
 		// frame buffer
