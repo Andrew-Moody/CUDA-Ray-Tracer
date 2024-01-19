@@ -165,6 +165,10 @@ namespace rtw
 
 		__host__ __device__ Vec3 getWorldPosFromPixelIndex(int index) const
 		{
+			// takes 2 more registers
+			//float y = static_cast<float>(index / screenWidth_);
+			//float x = index % screenWidth_;
+
 			// Truncate the result of "dividing" index by number of pixels in a screen row
 			float y{ static_cast<float>(static_cast<int>(index * recipWidth_)) };
 			float x{ index - y * screenWidth_ };
@@ -190,21 +194,28 @@ namespace rtw
 
 		__host__ __device__ Vec3 getSampleOrigin(uint32_t& pcgState) const
 		{
-			float shiftX{};
-			float shiftY{};
+			//float shiftX{};
+			//float shiftY{};
 
-			for (;;)
-			{
-				shiftX = 2.0f * randomFloat(pcgState) - 1.0f;
-				shiftY = 2.0f * randomFloat(pcgState) - 1.0f;
+			//for (;;)
+			//{
+			//	shiftX = 2.0f * randomFloat(pcgState) - 1.0f;
+			//	shiftY = 2.0f * randomFloat(pcgState) - 1.0f;
 
-				if (shiftX * shiftX + shiftY * shiftY <= 1.0f)
-				{
-					// dont normalize want inside unit disk not on edge
-					//shift.normalize();
-					break;
-				}
-			}			
+			//	if (shiftX * shiftX + shiftY * shiftY <= 1.0f)
+			//	{
+			//		// dont normalize want inside unit disk not on edge
+			//		//shift.normalize();
+			//		break;
+			//	}
+			//}
+
+			// Increased register use but not time
+			//// Get a uniformly random point inside a circle
+			float theta = 6.2831f * randomFloat(pcgState); // random angle around the circle
+			float r = sqrtf(randomFloat(pcgState)); // random distance along the radius
+			float shiftX{ r * cosf(theta) };
+			float shiftY{ r * sinf(theta) };
 
 			return cameraPos_ + (shiftX * lensBasisU_) + (shiftY * lensBasisV_);
 		}

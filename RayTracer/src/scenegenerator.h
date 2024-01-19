@@ -17,14 +17,14 @@ namespace rtw
 			// Final render
 
 			// Ground
-			spheres_.push_back(Sphere{ 0.0f, -1000.0f, 0.0f, 1000.0f, Material{ Vec3{ 0.5f, 0.5f, 0.5f }, BlendMode::diffuse } });
+			spheres_.push_back(Sphere{ 0.0f, -1000.0f, 0.0f, 1000.0f, Material{ Vec3{ 0.5f, 0.5f, 0.5f }, BlendMode::diffuse, 0.0f, 0.0f } });
 
 			// Large Spheres
 			spheres_.push_back(Sphere{ 0.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } });
 			
-			spheres_.push_back(Sphere{ -4.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 0.4f, 0.2f, 0.1f }, BlendMode::diffuse} });
+			spheres_.push_back(Sphere{ -4.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 0.4f, 0.2f, 0.1f }, BlendMode::diffuse, 0.0f, 0.0f} });
 			
-			spheres_.push_back(Sphere{ 4.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 0.7f, 0.6f, 0.5f }, BlendMode::metallic, 0.0f } });
+			spheres_.push_back(Sphere{ 4.0f, 1.0f, 0.0f, 1.0f, Material{ Vec3{ 0.7f, 0.6f, 0.5f }, BlendMode::metallic, 0.0f, 0.0f } });
 
 			// Add random small spheres
 			for (int x = -11; x < 11; ++x)
@@ -42,13 +42,13 @@ namespace rtw
 						{
 							// Diffuse
 							Vec3 albedo = randomVecMT() *= randomVecMT();
-							spheres_.push_back(Sphere{ center, radius, Material{ albedo, BlendMode::diffuse } });
+							spheres_.push_back(Sphere{ center, radius, Material{ albedo, BlendMode::diffuse, 0.0f, 0.0f } });
 						}
 						else if (randomMat < 0.90f)
 						{
 							// Metallic
 							Vec3 albedo = randomVecMT() * 0.5f + Vec3{ 0.5f, 0.5f, 0.5f };
-							spheres_.push_back(Sphere{ center, radius, Material{ albedo, BlendMode::metallic, randomFloatMT() * 0.5f } });
+							spheres_.push_back(Sphere{ center, radius, Material{ albedo, BlendMode::metallic, randomFloatMT() * 0.5f, 0.0f } });
 						}
 						else
 						{
@@ -60,29 +60,21 @@ namespace rtw
 			}
 
 			//// Chapter 13 scene
-			//*sphere = Sphere{ 0.0f, -100.5f, -1.0f, 100.0f, Material{ Vec3{ 0.8f, 0.8f, 0.4f }, BlendMode::diffuse, 1.0f } };
-			//sphere++;
-			//*sphere = Sphere{ 0.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.1f, 0.2f, 0.5f }, BlendMode::diffuse} };
-			//sphere++;
-			//*sphere = Sphere{ 1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.8f, 0.6f, 0.2f }, BlendMode::metallic, 0.0f } };
-			//sphere++;
+			//spheres_.push_back(Sphere{ 0.0f, -100.5f, -1.0f, 100.0f, Material{ Vec3{ 0.8f, 0.8f, 0.4f }, BlendMode::diffuse, 1.0f, 0.0f } });
+			//spheres_.push_back(Sphere{ 0.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.1f, 0.2f, 0.5f }, BlendMode::diffuse, 0.0f, 0.0f} });
+			//spheres_.push_back(Sphere{ 1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 0.8f, 0.6f, 0.2f }, BlendMode::metallic, 0.0f, 0.0f } });
 
 			//// Hollow glass
-			//*sphere = Sphere{ -1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
-			//sphere++;
-			//*sphere = Sphere{ -1.0f, 0.0f, -1.0f, -0.4f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } };
-			//sphere++;
-			//
+			//spheres_.push_back(Sphere{ -1.0f, 0.0f, -1.0f, 0.5f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } });
+			//spheres_.push_back(Sphere{ -1.0f, 0.0f, -1.0f, -0.4f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 1.5f } });
 
 			//// Extras for custom example
 			//// Diamond
-			//*sphere = Sphere{ -0.1f, 0.25f, -0.25f, 0.35f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 2.4f } };
-			//sphere++;
+			//spheres_.push_back(Sphere{ -0.1f, 0.25f, -0.25f, 0.35f, Material{ Vec3{ 1.0f, 1.0f, 1.0f }, BlendMode::translucent, 0.0f, 2.4f } });
 			//// Copper
-			//*sphere = Sphere{ -0.5f, 0.5f, -2.0f, 0.35f, Material{ Vec3{ 1.0f, 0.4f, 0.2f }, BlendMode::metallic, 0.0f } };
-			//sphere++;
+			//spheres_.push_back(Sphere{ -0.5f, 0.5f, -2.0f, 0.35f, Material{ Vec3{ 1.0f, 0.4f, 0.2f }, BlendMode::metallic, 0.0f, 0.0f } });
 			//// Ruby
-			//*sphere = Sphere{ 1.0f, -.35f, 0.0f, 0.15f, Material{ Vec3{ 1.0f, 0.5f, 0.5f }, BlendMode::translucent, 0.0f, 1.8f } };
+			//spheres_.push_back(Sphere{ 1.0f, -.35f, 0.0f, 0.15f, Material{ Vec3{ 1.0f, 0.5f, 0.5f }, BlendMode::translucent, 0.0f, 1.8f } });
 
 			generateColliders();
 

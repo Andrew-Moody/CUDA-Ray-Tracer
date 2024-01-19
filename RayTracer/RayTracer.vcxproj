@@ -137,11 +137,12 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <CudaCompile>
-      <FastMath>false</FastMath>
+      <FastMath>true</FastMath>
       <CodeGeneration>compute_61,sm_61</CodeGeneration>
       <GenerateLineInfo>true</GenerateLineInfo>
       <PtxAsOptionV>true</PtxAsOptionV>
       <InterleaveSourceInPTX>true</InterleaveSourceInPTX>
+      <MaxRegCount>0</MaxRegCount>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

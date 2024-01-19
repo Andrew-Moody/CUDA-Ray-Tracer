@@ -81,12 +81,12 @@ namespace rtw
 
 		__host__ __device__ float length() const
 		{
-			return std::sqrt(length_squared());
+			return sqrtf(length_squared());
 		}
 
 		__host__ __device__ Vec3& normalize()
 		{
-			*this *= (1.0f / std::sqrt(length_squared()));
+			*this *= (1.0f / sqrtf(length_squared()));
 			return *this;
 		}
 

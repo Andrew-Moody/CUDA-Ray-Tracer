@@ -33,24 +33,18 @@ namespace rtw
 				int closestIndex{ -1 };
 				float closestT{ 1.0e4f };
 
+
 				for (int i = 0; i < count_; ++i)
 				{
 					// t of 0.0f indicates a miss (t must be greater than a tolerance)
-					/*float t = colliders_[i].checkHit(ray);
+					float t = colliders_[i].checkHit(ray);
 					if (t > 0.0f && t < closestT)
 					{
 						closestIndex = i;
 						closestT = t;
-					}*/
-
-					// t > max distance indicates a miss
-					float t = colliders_[i].fastHit(ray);
-					if (t < closestT)
-					{
-						closestIndex = i;
-						closestT = t;
 					}
-				}
+				}			
+
 
 				if (closestIndex >= 0)
 				{

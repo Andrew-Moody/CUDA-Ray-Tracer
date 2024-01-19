@@ -4,6 +4,7 @@
 #include "vec3.cuh"
 #include "ray.cuh"
 #include "random.cuh"
+#include <cuda_runtime_api.h>
 
 namespace rtw
 {
@@ -59,6 +60,7 @@ namespace rtw
 			r0 *= r0;
 			//Changing pow to powf or 5 to 5.0f reduces registers/thread from 56 to 46
 			//r0 = r0 + ((1.0f - r0) * static_cast<float>(pow((1.0f - cosTheta), 5)));
+
 			r0 = r0 + ((1.0f - r0) * powf((1.0f - cosTheta), 5.0f));
 
 			return r0 > threshold;
@@ -81,11 +83,14 @@ namespace rtw
 			// means the ray came from inside the volume
 			// the book does not keep normals always pointing outwards meaning it skips this step
 			// but consistent normals is helpful in other places
+			//float refractRatio2 = material_.recipRI;
+
 			if (cosTheta < 0.0f)
 			{
 				// flip everything around to pretend you hit an air sphere in a world of glass
 				cosTheta = -cosTheta;
 				normal = -normal;
+				//refractRatio2 = material_.refractIndex;
 				refractRatio = 1.0f / refractRatio;
 			}
 
@@ -94,10 +99,12 @@ namespace rtw
 				// Reflect
 				return unitVector - (2.0f * dot(unitVector, normal) * normal);
 			}
+
+			
 			
 			// Refract
 			Vec3 perpendicular = refractRatio * (unitVector + (cosTheta * normal));
-			Vec3 parallel = normal * -std::sqrt(std::fabs(1.0f - perpendicular.length_squared()));
+			Vec3 parallel = normal * -sqrtf(fabsf(1.0f - perpendicular.length_squared()));
 
 			return perpendicular + parallel;
 		}
@@ -122,7 +129,7 @@ namespace rtw
 			// Generate a random vector with components in the range [-1.0f, 1.0f]
 			// reject if the vector falls outside the unit circle (square length > 1)
 			// this prevents the distribution from skewing towards the corners of the bounding cube
-			Vec3 randUnitDir{};
+			/*Vec3 randUnitDir{};
 			for (;;)
 			{
 				randUnitDir[0] = 2.0f * randomFloat(pcgState) - 1.0f;
@@ -134,7 +141,16 @@ namespace rtw
 					randUnitDir.normalize();
 					break;
 				}
-			}		
+			}	*/	
+
+			// Suprisingly did not seem to increase register use or time
+			// Get a unit vector by first getting a random point on a cylinder
+			// with unit radius and 2 x unit length and projecting onto a sphere
+			float theta = 6.2831f * randomFloat(pcgState); // random angle around the cylider
+			float z = 2.0f * randomFloat(pcgState) - 1.0f; // random distance along the length
+			float p = sqrtf(1 - z * z);
+
+			Vec3 randUnitDir{ p * cosf(theta), p * sinf(theta), z };
 
 
 			if (material_.mode == BlendMode::diffuse)

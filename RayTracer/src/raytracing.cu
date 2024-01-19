@@ -26,7 +26,10 @@ namespace rtw
 		}
 	}
 
-	__global__ void renderRayKernel(float* buffer, Camera camera, Scene scene)
+	
+	__global__ void
+	__launch_bounds__(256, 8)
+	renderRayKernel(float* buffer, Camera camera, Scene scene)
 	{
 		int strideX = blockDim.x * gridDim.x;
 		int thread = threadIdx.x + blockIdx.x * blockDim.x;
@@ -46,9 +49,7 @@ namespace rtw
 				// Create a ray from a random point on DOF disk to random point in the pixel
 				Ray ray = camera.generateRay(worldPos, pcgState);
 
-				//color += scene.getColor(ray, camera.nBounces(), pcgState);
-				
-				color += ray.direction();
+				color += scene.getColor(ray, camera.nBounces(), pcgState);
 			}
 
 			//color *= 1.0f / camera.nSamples();

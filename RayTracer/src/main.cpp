@@ -12,8 +12,8 @@ int main()
 	constexpr int width{ 1200 }; // image width in pixels
 	constexpr int height{ 675 }; // image height in pixels
 	constexpr int nChannels{ 3 }; // floats per pixel 3 for rgb, 4 for rgba
-	constexpr int nSamples{ 5 }; // number of samples per pixel for anti-aliasing
-	constexpr int nBounces{ 50 }; // number of bounces before discarding a rays contribution
+	constexpr int nSamples{ 500 }; // number of samples per pixel for anti-aliasing
+	constexpr int nBounces{ 10 }; // number of bounces before discarding a rays contribution
 
 	rtw::Camera camera{ width, height, nChannels, nSamples, nBounces };
 
